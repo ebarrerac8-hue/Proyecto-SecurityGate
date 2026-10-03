@@ -7,13 +7,16 @@ namespace SecureGate
     public partial class MainWindow : Window
     {
         private DownloadMonitor _monitor;
+        private EvaluadorInicial _evaluador; // Instancia de tu módulo
 
         public MainWindow()
         {
             InitializeComponent();
 
-            // Inicializar el monitor de descargas en segundo plano
+            // Inicializar módulos
             _monitor = new DownloadMonitor();
+            _evaluador = new EvaluadorInicial();
+
             _monitor.ArchivoDetectado += OnNuevoArchivoDescargado;
             _monitor.IniciarMonitoreo();
         }
@@ -24,12 +27,11 @@ namespace SecureGate
             {
                 try
                 {
-                    // 1. Analizar metadatos, SHA-256 y firma digital
+                    // Analizar metadatos, SHA-256 y firma digital
                     var info = FileAnalyzer.AnalizarArchivo(rutaArchivo);
 
-                    // 2. Evaluar si se considera potencialmente riesgoso
-                    bool esEjecutable = info.Extension == ".exe" || info.Extension == ".bat" || info.Extension == ".ps1" || info.Extension == ".msi";
-                    bool esSospechoso = !info.TieneFirma || esEjecutable;
+                    // Entra tu módulo en acción
+                    var resultado = _evaluador.Evaluar(info);
 
                     string reporte = $"¡NUEVO ARCHIVO DETECTADO EN DESCARGAS!\n\n" +
                                      $"Nombre: {info.Nombre}\n" +
@@ -39,17 +41,19 @@ namespace SecureGate
                                      $"Estado: {info.EstadoFirma}\n" +
                                      $"Firmante: {info.Firmante}\n\n" +
                                      $"--- HASH SHA-256 ---\n" +
-                                     $"{info.HashSHA256}\n\n";
+                                     $"{info.HashSHA256}\n\n" +
+                                     $"--- EVALUACIÓN INICIAL ---\n" +
+                                     $"Nivel de Riesgo: {resultado.NivelRiesgo}\n" +
+                                     $"Motivo: {resultado.Motivo}\n\n";
 
-                    if (esSospechoso)
+                    // Evaluador decide si requiere atención y muestra el Sandbox
+                    if (resultado.RequiereAtencion)
                     {
-                        reporte += "⚠️ ATENCIÓN: El archivo no tiene firma digital o es un ejecutable.\n\n" +
-                                   "¿Deseas probarlo de forma aislada dentro de Windows Sandbox?";
+                        reporte += "¿Deseas probarlo de forma aislada dentro de Windows Sandbox?";
 
                         MessageBoxResult respuesta = MessageBox.Show(reporte, "SecureGate - Alerta Preventiva",
                                                                      MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
-                        // 3. Si el usuario acepta, se invoca el SandboxLauncher
                         if (respuesta == MessageBoxResult.Yes)
                         {
                             string error;
@@ -69,7 +73,6 @@ namespace SecureGate
                     }
                     else
                     {
-                        reporte += "✅ El archivo posee una firma digital válida.";
                         MessageBox.Show(reporte, "SecureGate - Análisis Completo",
                                         MessageBoxButton.OK, MessageBoxImage.Information);
                     }

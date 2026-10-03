@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using System.Windows; 
 
 namespace SecureGate.Monitoreo
 {
@@ -8,31 +9,36 @@ namespace SecureGate.Monitoreo
     {
         private FileSystemWatcher _watcher;
 
-        // Evento que se dispara cuando se detecta un archivo nuevo y completo
+        
         public event Action<string> ArchivoDetectado;
 
         public void IniciarMonitoreo()
         {
-            // Obtener automáticamente la ruta C:\Users\<Usuario>\Downloads
+            // Obtener automáticamente la ruta de Descargas 
             string rutaDescargas = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 "Downloads"
             );
 
+            // Si no encuentra la carpeta, avisar en lugar de apagarse en silencio
             if (!Directory.Exists(rutaDescargas))
             {
+                MessageBox.Show($"SecureGate no pudo encontrar la carpeta de descargas en:\n{rutaDescargas}\n\nEl monitoreo automático está desactivado.",
+                                "SecureGate - Error de Configuración", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             _watcher = new FileSystemWatcher(rutaDescargas)
             {
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-                EnableRaisingEvents = true
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size
             };
 
-            // Detectar creación directa o cuando el navegador renombre el archivo al terminar
+            //  Primero conectar los eventos...
             _watcher.Created += OnArchivoCambio;
             _watcher.Renamed += OnArchivoRenombrado;
+
+            //  Despues encender el monitor
+            _watcher.EnableRaisingEvents = true;
         }
 
         public void DetenerMonitoreo()
@@ -58,7 +64,7 @@ namespace SecureGate.Monitoreo
         {
             string extension = Path.GetExtension(rutaArchivo).ToLower();
 
-            // Ignorar archivos temporales de navegadores (Chrome, Edge, Firefox)
+            // Ignorar archivos temporales de navegadores
             if (extension == ".crdownload" || extension == ".tmp" || extension == ".part")
             {
                 return;
@@ -84,11 +90,16 @@ namespace SecureGate.Monitoreo
                     using (FileStream stream = File.Open(ruta, FileMode.Open, FileAccess.Read, FileShare.None))
                     {
                         if (stream.Length > 0)
-                            return true;
+                        {
+                            return true; // Archivo listo y con contenido
+                        }
                     }
+                    //  Si el archivo aún tiene 0 bytes, debe pausar antes de volver a intentar
+                    await Task.Delay(500);
                 }
                 catch (IOException)
                 {
+                    // Si el archivo está bloqueado, espera medio segundo
                     await Task.Delay(500);
                 }
             }
