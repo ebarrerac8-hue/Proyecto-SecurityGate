@@ -1,0 +1,127 @@
+﻿using System;
+using System.Drawing;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Windows.Forms;
+
+namespace SecureGate
+{
+    public partial class Form1 : Form
+    {
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            // Aplicar estilo general
+            this.Font = new Font("Segoe UI", 10F);
+            lblTitle.ForeColor = Color.FromArgb(17, 24, 39);
+
+            // Cargar logo si existe en la carpeta de la aplicación
+            string logoPath = Path.Combine(Application.StartupPath, "modulos.png");
+            if (File.Exists(logoPath))
+            {
+                try
+                {
+                    pictureBoxLogo.Image = Image.FromFile(logoPath);
+                }
+                catch { }
+            }
+        }
+
+        private void selectFileButton_Click(object sender, EventArgs e)
+        {
+            if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            {
+                string path = openFileDialog1.FileName;
+                ProcessFile(path);
+            }
+        }
+
+        private void ProcessFile(string path)
+        {
+            try
+            {
+                var fi = new FileInfo(path);
+                lblName.Text = $"Nombre: {fi.Name}";
+                lblType.Text = $"Tipo: {fi.Extension}";
+                lblSize.Text = $"Tamaño: {fi.Length / 1024} KB";
+                lblHash.Text = $"Hash SHA-256: calculando...";
+
+                // Calcular SHA-256 de forma síncrona (archivo pequeño esperado en prototipo)
+                using (var stream = File.OpenRead(path))
+                using (var sha = SHA256.Create())
+                {
+                    var hash = sha.ComputeHash(stream);
+                    var sb = new StringBuilder();
+                    foreach (var b in hash) sb.Append(b.ToString("x2"));
+                    lblHash.Text = $"Hash SHA-256: {sb}";
+                }
+
+                lblSignature.Text = "Firma digital: -";
+                lblReputation.Text = "Reputación: -";
+
+                // Añadir a la lista de recientes
+                var item = new ListViewItem(new string[] { fi.Name, path, DateTime.Now.ToString("g"), "Pendiente" });
+                listViewRecent.Items.Insert(0, item);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al procesar archivo: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void dragPanel_DragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effect = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.Effect = DragDropEffects.None;
+            }
+        }
+
+        private void dragPanel_DragDrop(object sender, DragEventArgs e)
+        {
+            if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0)
+                {
+                    // Procesar el primer archivo soltado
+                    ProcessFile(files[0]);
+                }
+            }
+        }
+
+        private void lblTitle_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btnConfig_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void lblDrag_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void listViewRecent_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void lblSignature_Click(object sender, EventArgs e)
+        {
+
+        }
+    }
+}
