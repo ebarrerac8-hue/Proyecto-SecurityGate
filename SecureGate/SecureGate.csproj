@@ -59,6 +59,8 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Compile Include="Analisis\DigitalSignatureVerifier.cs" />
+    <Compile Include="Analisis\FileAnalyzer.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -69,6 +71,9 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Monitoreo\DownloadMonitor.cs" />
+    <Compile Include="Monitoreo\SandboxChecker.cs" />
+    <Compile Include="Monitoreo\SandboxLauncher.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -95,8 +100,6 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Analisis\" />
-    <Folder Include="Monitoreo\" />
     <Folder Include="SeguridadTCP\" />
     <Folder Include="UI\" />
   </ItemGroup>
