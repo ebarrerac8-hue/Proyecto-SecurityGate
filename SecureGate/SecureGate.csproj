@@ -72,6 +72,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Monitoreo\DownloadMonitor.cs" />
+    <Compile Include="Monitoreo\GestorSandbox.cs" />
+    <Compile Include="Monitoreo\ResultadoSandbox.cs" />
     <Compile Include="Monitoreo\SandboxChecker.cs" />
     <Compile Include="Monitoreo\SandboxLauncher.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">

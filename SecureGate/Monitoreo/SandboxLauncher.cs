@@ -1,62 +1,115 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
+using System.Xml.Linq;
 
 namespace SecureGate.Monitoreo
 {
     public static class SandboxLauncher
     {
-        /// <summary>
-        /// Genera un archivo .wsb temporal que comparte la carpeta del archivo descargado
-        /// y ejecuta Windows Sandbox de forma aislada.
-        /// </summary>
-        public static bool EjecutarEnSandbox(string rutaArchivo, out string mensajeError)
+        public static bool EjecutarEnSandbox(
+            string rutaArchivo,
+            out string mensajeError)
         {
             mensajeError = string.Empty;
 
-            if (!File.Exists(rutaArchivo))
-            {
-                mensajeError = "El archivo a probar no existe en el disco.";
-                return false;
-            }
-
             try
             {
-                string carpetaContenedora = Path.GetDirectoryName(rutaArchivo);
-                string archivoWsbTemp = Path.Combine(Path.GetTempPath(), "SecureGate_Test.wsb");
-
-                // Crear la configuración XML (.wsb) para Windows Sandbox
-                string contenidoWsb = $@"<Configuration>
-  <VGpu>Enable</VGpu>
-  <Networking>Disable</Networking>
-  <MappedFolders>
-    <MappedFolder>
-      <HostFolder>{carpetaContenedora}</HostFolder>
-      <ReadOnly>true</ReadOnly>
-    </MappedFolder>
-  </MappedFolders>
-  <LogonCommand>
-    <Command>explorer.exe C:\Users\WDAGUtilityUser\Desktop</Command>
-  </LogonCommand>
-</Configuration>";
-
-                File.WriteAllText(archivoWsbTemp, contenidoWsb);
-
-                // Lanzar Windows Sandbox con el archivo de configuración
-                ProcessStartInfo psi = new ProcessStartInfo
+                if (string.IsNullOrWhiteSpace(rutaArchivo))
                 {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c start \"\" \"{archivoWsbTemp}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                    mensajeError = "No se proporcionó un archivo.";
+                    return false;
+                }
 
-                Process.Start(psi);
+                string rutaOriginal = Path.GetFullPath(rutaArchivo);
+
+                if (!File.Exists(rutaOriginal))
+                {
+                    mensajeError = "El archivo a probar no existe.";
+                    return false;
+                }
+
+                string carpetaPrueba = Path.Combine(
+                    Path.GetTempPath(),
+                    "SecureGate",
+                    "Sandbox",
+                    Guid.NewGuid().ToString("N")
+                );
+
+                string carpetaMuestra = Path.Combine(
+                    carpetaPrueba,
+                    "Muestra"
+                );
+
+                Directory.CreateDirectory(carpetaMuestra);
+
+               
+                string copiaArchivo = Path.Combine(
+                    carpetaMuestra,
+                    Path.GetFileName(rutaOriginal)
+                );
+
+                File.Copy(rutaOriginal, copiaArchivo);
+
+                string rutaWsb = Path.Combine(
+                    carpetaPrueba,
+                    "Prueba.wsb"
+                );
+
+                
+                XDocument configuracion = new XDocument(
+                    new XElement("Configuration",
+                        new XElement("vGPU", "Disable"),
+                        new XElement("Networking", "Disable"),
+                        new XElement("ClipboardRedirection", "Disable"),
+                        new XElement("AudioInput", "Disable"),
+                        new XElement("VideoInput", "Disable"),
+                        new XElement("PrinterRedirection", "Disable"),
+
+                        new XElement("MappedFolders",
+                            new XElement("MappedFolder",
+                                new XElement(
+                                    "HostFolder",
+                                    carpetaMuestra
+                                ),
+                                new XElement(
+                                    "SandboxFolder",
+                                    @"C:\SecureGate\Muestra"
+                                ),
+                                new XElement("ReadOnly", "true")
+                            )
+                        ),
+
+                        new XElement("LogonCommand",
+                            new XElement(
+                                "Command",
+                                @"explorer.exe C:\SecureGate\Muestra"
+                            )
+                        )
+                    )
+                );
+
+                configuracion.Save(rutaWsb);
+
+                GestorSandbox gestor = new GestorSandbox();
+
+                ResultadoSandbox resultado = gestor.Iniciar(
+                    rutaWsb,
+                    autorizadoPorUsuario: true
+                );
+
+                if (resultado.Estado != EstadoSandbox.InicioSolicitado)
+                {
+                    mensajeError = resultado.Mensaje;
+                    return false;
+                }
+
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
-                mensajeError = $"Error al iniciar Sandbox: {ex.Message}";
+                mensajeError =
+                    "No se pudo preparar la prueba: " + error.Message;
+
                 return false;
             }
         }
