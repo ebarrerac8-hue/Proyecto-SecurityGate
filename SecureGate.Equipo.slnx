@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/SecureGateIntegrado_NET10 (1)/">
+    <Project Path="SecureGateIntegrado_NET10 (1)/SecureGateIntegrado/SecureGateIntegrado.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/SecureGate.Contratos/SecureGate.Contratos.csproj" />
+    <Project Path="src/SecureGate.Proteccion/SecureGate.Proteccion.csproj" />
+    <Project Path="src/SecureGate.Sandbox/SecureGate.Sandbox.csproj" />
+    <Project Path="src/SecureGate.Servidor/SecureGate.Servidor.csproj" />
+  </Folder>
+</Solution>
