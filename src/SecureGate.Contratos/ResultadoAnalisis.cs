@@ -16,6 +16,14 @@ public sealed class ResultadoAnalisis
 
     public List<string> Motivos { get; set; } = new();
 
+    public List<string> Limitaciones { get; set; } = new();
+
+    public ResultadoAnalisisLocal? AnalisisLocal { get; set; }
+
+    public ResultadoReputacion? Reputacion { get; set; }
+
+    public InformeSandbox? Sandbox { get; set; }
+
     public string? CodigoError { get; set; }
 
     public DateTimeOffset FechaCreacionUtc { get; init; }
