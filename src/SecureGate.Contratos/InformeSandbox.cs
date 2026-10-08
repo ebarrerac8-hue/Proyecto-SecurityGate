@@ -14,7 +14,7 @@ public enum TipoEventoSandbox
 
 public sealed class EventoSandbox
 {
-    public Guid EventoId { get; init; }
+    public Guid EventoId { get; init; } = Guid.NewGuid();
 
     public DateTimeOffset FechaUtc { get; init; }
 
