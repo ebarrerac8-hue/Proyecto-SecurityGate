@@ -1,7 +1,5 @@
 ﻿using System.Text;
 
-namespace SecureGate.Sandbox;
-
 public static class ConfiguradorWsb
 {
     public static string GenerarConfiguracion(string carpetaMuestraHost, bool permitirRed)
@@ -19,7 +17,7 @@ public static class ConfiguradorWsb
         wsbContent.AppendLine("    </MappedFolder>");
         wsbContent.AppendLine("  </MappedFolders>");
         wsbContent.AppendLine("  <LogonCommand>");
-        wsbContent.AppendLine("    <Command>explorer.exe C:\\Muestra</Command>");
+        wsbContent.AppendLine("    <Command>powershell.exe -ExecutionPolicy Bypass -File C:\\Muestra\\Observador.ps1</Command>");
         wsbContent.AppendLine("  </LogonCommand>");
         wsbContent.AppendLine("</Configuration>");
 

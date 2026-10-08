@@ -1,6 +1,8 @@
-﻿using System.Diagnostics;
+﻿using SecureGate.Contratos;
+using SecureGate.Sandbox.Services;
+using System.Diagnostics;
 using System.Security.Cryptography;
-using SecureGate.Contratos;
+using System.Text.Json;
 
 namespace SecureGate.Sandbox;
 
@@ -12,8 +14,9 @@ public class GestorSandbox
         {
             SolicitudId = solicitud.SolicitudId,
             Estado = EstadoEjecucionSandbox.NoIniciado
-        }; 
+        };
 
+        // 1. Verificar disponibilidad del entorno y recursos
         if (!VerificadorEntorno.EsSandboxDisponible())
         {
             informe.Estado = EstadoEjecucionSandbox.ErrorArranque;
@@ -28,6 +31,7 @@ public class GestorSandbox
             return informe;
         }
 
+        // 2. Validar existencia de la muestra y comprobar hash SHA-256
         if (!File.Exists(solicitud.RutaMuestraServidor))
         {
             informe.Estado = EstadoEjecucionSandbox.ErrorArranque;
@@ -44,6 +48,17 @@ public class GestorSandbox
         }
 
         string carpetaMuestra = Path.GetDirectoryName(solicitud.RutaMuestraServidor) ?? Path.GetTempPath();
+
+        // 3. Copiar el script Observador desde Assets/Guest a la carpeta compartida
+        string rutaObservadorBase = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Guest", "Observador.ps1");
+        string rutaObservadorDestino = Path.Combine(carpetaMuestra, "Observador.ps1");
+
+        if (File.Exists(rutaObservadorBase))
+        {
+            File.Copy(rutaObservadorBase, rutaObservadorDestino, overwrite: true);
+        }
+
+        // 4. Generar el archivo .wsb temporal
         string rutaWsb = Path.Combine(carpetaMuestra, $"analisis_{solicitud.SolicitudId}.wsb");
 
         try
@@ -53,6 +68,7 @@ public class GestorSandbox
 
             var cronometro = Stopwatch.StartNew();
 
+            // 5. Iniciar Windows Sandbox
             var psi = new ProcessStartInfo
             {
                 FileName = rutaWsb,
@@ -67,6 +83,7 @@ public class GestorSandbox
                 return informe;
             }
 
+            // 6. Controlar la duración con tiempo límite (timeout)
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(solicitud.TiempoMaximoEjecucion);
 
@@ -92,12 +109,21 @@ public class GestorSandbox
                 }
             }
 
-            informe.Eventos.Add(new EventoComportamiento
+            // 7. Recopilar evidencias generadas por Observador.ps1
+            string rutaEvidencias = Path.Combine(carpetaMuestra, "evidencias.json");
+            if (File.Exists(rutaEvidencias))
             {
-                TimestampUtc = DateTimeOffset.UtcNow,
-                TipoEvento = "EntornoSandboxIniciado",
-                Detalle = $"Sesión iniciada correctamente. Red habilitada: {solicitud.PermitirRed}"
-            });
+                string json = await File.ReadAllTextAsync(rutaEvidencias, cancellationToken);
+                var eventos = JsonSerializer.Deserialize<List<EventoComportamiento>>(json);
+                if (eventos != null)
+                {
+                    informe.Eventos.AddRange(eventos);
+                }
+            }
+            else
+            {
+                informe.Observaciones += " (No se detectó reporte de evidencias del entorno aislado).";
+            }
 
             return informe;
         }
@@ -109,6 +135,7 @@ public class GestorSandbox
         }
         finally
         {
+            // Limpieza del archivo .wsb
             if (File.Exists(rutaWsb))
             {
                 try { File.Delete(rutaWsb); } catch { }

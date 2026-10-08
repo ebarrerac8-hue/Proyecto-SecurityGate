@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 
-namespace SecureGate.Sandbox;
+namespace SecureGate.Sandbox.Services;
 
 public static class VerificadorEntorno
 {
