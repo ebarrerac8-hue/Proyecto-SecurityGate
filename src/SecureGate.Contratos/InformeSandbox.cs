@@ -1,27 +1,60 @@
 ﻿namespace SecureGate.Contratos;
 
-public enum EstadoEjecucionSandbox
+public enum TipoEventoSandbox
 {
-    Completado = 0,
-    Timeout = 1,
-    ErrorArranque = 2,
-    FaltaRecursos = 3,
-    NoIniciado = 4
+    Otro = 0,
+    ProcesoIniciado = 1,
+    ProcesoFinalizado = 2,
+    ArchivoCreado = 3,
+    ArchivoModificado = 4,
+    ArchivoEliminado = 5,
+    RegistroModificado = 6,
+    ConexionIntentada = 7
 }
 
-public class EventoComportamiento
+public sealed class EventoSandbox
 {
-    public DateTimeOffset TimestampUtc { get; set; }
-    public string TipoEvento { get; set; } = string.Empty;
-    public string Detalle { get; set; } = string.Empty;
+    public Guid EventoId { get; init; } = Guid.NewGuid();
+
+    public DateTimeOffset FechaUtc { get; init; }
+
+    public TipoEventoSandbox Tipo { get; init; }
+
+    public int? ProcesoId { get; init; }
+
+    public int? ProcesoPadreId { get; init; }
+
+    public string? NombreProceso { get; init; }
+
+    public string? Recurso { get; init; }
+
+    public string Detalle { get; init; } = string.Empty;
 }
 
-public class InformeSandbox
+public sealed class InformeSandbox
 {
-    public Guid SolicitudId { get; set; }
-    public EstadoEjecucionSandbox Estado { get; set; }
-    public TimeSpan DuracionEfectiva { get; set; }
-    public List<EventoComportamiento> Eventos { get; set; } = new();
-    public string? Observaciones { get; set; }
-    public bool InteraccionRequerida { get; set; }
+    public Guid AnalisisId { get; init; }
+
+    public Guid ArchivoId { get; init; }
+
+    public required string Sha256 { get; init; }
+
+    public EstadoComprobacion Estado { get; set; }
+        = EstadoComprobacion.NoRealizada;
+
+    public bool MuestraEjecutada { get; set; }
+
+    public bool ObservadorIniciado { get; set; }
+
+    public bool RedHabilitada { get; set; }
+
+    public DateTimeOffset? InicioUtc { get; set; }
+
+    public DateTimeOffset? FinUtc { get; set; }
+
+    public List<EventoSandbox> Eventos { get; set; } = new();
+
+    public List<string> Limitaciones { get; set; } = new();
+
+    public string? CodigoError { get; set; }
 }

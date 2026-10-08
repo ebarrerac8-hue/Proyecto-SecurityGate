@@ -6,69 +6,85 @@ using System.Text.Json;
 
 namespace SecureGate.Sandbox;
 
-public class GestorSandbox
+public class GestorSandbox : IAnalizadorSandbox
 {
-    public async Task<InformeSandbox> EjecutarAnalisisAsync(SolicitudSandbox solicitud, CancellationToken cancellationToken = default)
+    public async Task<InformeSandbox> EjecutarAsync(
+        SolicitudPruebaSandbox solicitud,
+        CancellationToken cancellationToken = default)
     {
+        DateTimeOffset inicioUtc = DateTimeOffset.UtcNow;
+
         var informe = new InformeSandbox
         {
-            SolicitudId = solicitud.SolicitudId,
-            Estado = EstadoEjecucionSandbox.NoIniciado
+            AnalisisId = solicitud.AnalisisId,
+            ArchivoId = solicitud.ArchivoId,
+            Sha256 = solicitud.Sha256,
+            InicioUtc = inicioUtc,
+            Estado = EstadoComprobacion.NoRealizada,
+            MuestraEjecutada = false,
+            ObservadorIniciado = false,
+            RedHabilitada = false
         };
 
-        // 1. Verificar disponibilidad del entorno y recursos
         if (!VerificadorEntorno.EsSandboxDisponible())
         {
-            informe.Estado = EstadoEjecucionSandbox.ErrorArranque;
-            informe.Observaciones = "Windows Sandbox no está disponible o instalado en el servidor.";
+            informe.Estado = EstadoComprobacion.NoDisponible;
+            informe.CodigoError = "SANDBOX_NO_INSTALADO";
+            informe.Limitaciones.Add("Windows Sandbox no está habilitado o instalado en la computadora servidor.");
+            informe.FinUtc = DateTimeOffset.UtcNow;
             return informe;
         }
 
         if (!VerificadorEntorno.VerificarRecursosSuficientes())
         {
-            informe.Estado = EstadoEjecucionSandbox.FaltaRecursos;
-            informe.Observaciones = "Recursos de memoria insuficientes en el servidor para iniciar la prueba.";
+            informe.Estado = EstadoComprobacion.Fallida;
+            informe.CodigoError = "RECURSOS_INSUFICIENTES";
+            informe.Limitaciones.Add("Memoria RAM insuficiente en el servidor para iniciar el entorno aislado.");
+            informe.FinUtc = DateTimeOffset.UtcNow;
             return informe;
         }
 
-        // 2. Validar existencia de la muestra y comprobar hash SHA-256
         if (!File.Exists(solicitud.RutaMuestraServidor))
         {
-            informe.Estado = EstadoEjecucionSandbox.ErrorArranque;
-            informe.Observaciones = "El archivo de la muestra no existe en la ruta proporcionada.";
+            informe.Estado = EstadoComprobacion.Fallida;
+            informe.CodigoError = "MUESTRA_NO_ENCONTRADA";
+            informe.Limitaciones.Add($"No se encontró la muestra en la ruta especificada: {solicitud.RutaMuestraServidor}");
+            informe.FinUtc = DateTimeOffset.UtcNow;
             return informe;
         }
 
         string hashCalculado = ObtenerSha256(solicitud.RutaMuestraServidor);
-        if (!string.Equals(hashCalculado, solicitud.Sha256Esperado, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(hashCalculado, solicitud.Sha256, StringComparison.OrdinalIgnoreCase))
         {
-            informe.Estado = EstadoEjecucionSandbox.ErrorArranque;
-            informe.Observaciones = "El hash SHA-256 de la muestra no coincide con el valor esperado.";
+            informe.Estado = EstadoComprobacion.Fallida;
+            informe.CodigoError = "HASH_NO_COINCIDE";
+            informe.Limitaciones.Add("El hash SHA-256 calculado del archivo no coincide con el hash esperado.");
+            informe.FinUtc = DateTimeOffset.UtcNow;
             return informe;
         }
 
         string carpetaMuestra = Path.GetDirectoryName(solicitud.RutaMuestraServidor) ?? Path.GetTempPath();
 
-        // 3. Copiar el script Observador desde Assets/Guest a la carpeta compartida
         string rutaObservadorBase = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Guest", "Observador.ps1");
         string rutaObservadorDestino = Path.Combine(carpetaMuestra, "Observador.ps1");
 
         if (File.Exists(rutaObservadorBase))
         {
             File.Copy(rutaObservadorBase, rutaObservadorDestino, overwrite: true);
+            informe.ObservadorIniciado = true;
+        }
+        else
+        {
+            informe.Limitaciones.Add("No se encontró el script Observador.ps1 en los Assets del sistema.");
         }
 
-        // 4. Generar el archivo .wsb temporal
-        string rutaWsb = Path.Combine(carpetaMuestra, $"analisis_{solicitud.SolicitudId}.wsb");
+        string rutaWsb = Path.Combine(carpetaMuestra, $"analisis_{solicitud.AnalisisId}.wsb");
 
         try
         {
-            string contenidoWsb = ConfiguradorWsb.GenerarConfiguracion(carpetaMuestra, solicitud.PermitirRed);
+            string contenidoWsb = ConfiguradorWsb.GenerarConfiguracion(carpetaMuestra, permitirRed: false);
             await File.WriteAllTextAsync(rutaWsb, contenidoWsb, cancellationToken);
 
-            var cronometro = Stopwatch.StartNew();
-
-            // 5. Iniciar Windows Sandbox
             var psi = new ProcessStartInfo
             {
                 FileName = rutaWsb,
@@ -78,30 +94,27 @@ public class GestorSandbox
             using var proceso = Process.Start(psi);
             if (proceso == null)
             {
-                informe.Estado = EstadoEjecucionSandbox.ErrorArranque;
-                informe.Observaciones = "No se pudo iniciar el proceso de Windows Sandbox.";
+                informe.Estado = EstadoComprobacion.Fallida;
+                informe.CodigoError = "ERROR_INICIO_SANDBOX";
+                informe.Limitaciones.Add("No se pudo arrancar el proceso de Windows Sandbox.");
+                informe.FinUtc = DateTimeOffset.UtcNow;
                 return informe;
             }
 
-            // 6. Controlar la duración con tiempo límite (timeout)
+            informe.MuestraEjecutada = true;
+
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(solicitud.TiempoMaximoEjecucion);
+            cts.CancelAfter(TimeSpan.FromSeconds(solicitud.TiempoObservacionSegundos));
 
             try
             {
                 await proceso.WaitForExitAsync(cts.Token);
-                cronometro.Stop();
-
-                informe.Estado = EstadoEjecucionSandbox.Completado;
-                informe.DuracionEfectiva = cronometro.Elapsed;
-                informe.Observaciones = "Prueba finalizada normalmente.";
+                informe.Estado = EstadoComprobacion.Completada;
             }
             catch (OperationCanceledException)
             {
-                cronometro.Stop();
-                informe.Estado = EstadoEjecucionSandbox.Timeout;
-                informe.DuracionEfectiva = cronometro.Elapsed;
-                informe.Observaciones = "La prueba alcanzó el tiempo máximo límite permitido.";
+                informe.Estado = EstadoComprobacion.Completada;
+                informe.Limitaciones.Add($"La prueba finalizó por alcanzar el tiempo máximo configurado ({solicitud.TiempoObservacionSegundos}s).");
 
                 if (!proceso.HasExited)
                 {
@@ -109,12 +122,11 @@ public class GestorSandbox
                 }
             }
 
-            // 7. Recopilar evidencias generadas por Observador.ps1
             string rutaEvidencias = Path.Combine(carpetaMuestra, "evidencias.json");
             if (File.Exists(rutaEvidencias))
             {
                 string json = await File.ReadAllTextAsync(rutaEvidencias, cancellationToken);
-                var eventos = JsonSerializer.Deserialize<List<EventoComportamiento>>(json);
+                var eventos = JsonSerializer.Deserialize<List<EventoSandbox>>(json);
                 if (eventos != null)
                 {
                     informe.Eventos.AddRange(eventos);
@@ -122,25 +134,26 @@ public class GestorSandbox
             }
             else
             {
-                informe.Observaciones += " (No se detectó reporte de evidencias del entorno aislado).";
+                informe.Limitaciones.Add("No se encontró el archivo de reporte de evidencias (evidencias.json) al finalizar.");
             }
-
-            return informe;
         }
         catch (Exception ex)
         {
-            informe.Estado = EstadoEjecucionSandbox.ErrorArranque;
-            informe.Observaciones = $"Error durante la ejecución del Sandbox: {ex.Message}";
-            return informe;
+            informe.Estado = EstadoComprobacion.Fallida;
+            informe.CodigoError = "EXCEPCION_EJECUCION";
+            informe.Limitaciones.Add($"Ocurrió un error inesperado en la prueba: {ex.Message}");
         }
         finally
         {
-            // Limpieza del archivo .wsb
+            informe.FinUtc = DateTimeOffset.UtcNow;
+
             if (File.Exists(rutaWsb))
             {
                 try { File.Delete(rutaWsb); } catch { }
             }
         }
+
+        return informe;
     }
 
     private static string ObtenerSha256(string rutaArchivo)
