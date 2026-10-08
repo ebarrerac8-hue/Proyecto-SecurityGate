@@ -1,26 +1,33 @@
-﻿using System.Text;
+using System.Xml.Linq;
+
+namespace SecureGate.Sandbox.Services;
 
 public static class ConfiguradorWsb
 {
-    public static string GenerarConfiguracion(string carpetaMuestraHost, bool permitirRed)
+    public static string GenerarConfiguracion(string entrada, string salida)
     {
-        string networking = permitirRed ? "Default" : "Disable";
+        var xml = new XElement("Configuration",
+            new XElement("VGpu", "Disable"),
+            new XElement("Networking", "Disable"),
+            new XElement("ClipboardRedirection", "Disable"),
+            new XElement("AudioInput", "Disable"),
+            new XElement("VideoInput", "Disable"),
+            new XElement("PrinterRedirection", "Disable"),
+            new XElement("MappedFolders",
+                Carpeta(entrada, @"C:\Entrada", true),
+                Carpeta(salida, @"C:\Salida", false)),
+            new XElement("LogonCommand",
+                new XElement("Command",
+                    @"powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Entrada\Observador.ps1")));
 
-        var wsbContent = new StringBuilder();
-        wsbContent.AppendLine("<Configuration>");
-        wsbContent.AppendLine($"  <Networking>{networking}</Networking>");
-        wsbContent.AppendLine("  <MappedFolders>");
-        wsbContent.AppendLine("    <MappedFolder>");
-        wsbContent.AppendLine($"      <HostFolder>{carpetaMuestraHost}</HostFolder>");
-        wsbContent.AppendLine("      <SandboxFolder>C:\\Muestra</SandboxFolder>");
-        wsbContent.AppendLine("      <ReadOnly>false</ReadOnly>");
-        wsbContent.AppendLine("    </MappedFolder>");
-        wsbContent.AppendLine("  </MappedFolders>");
-        wsbContent.AppendLine("  <LogonCommand>");
-        wsbContent.AppendLine("    <Command>powershell.exe -ExecutionPolicy Bypass -File C:\\Muestra\\Observador.ps1</Command>");
-        wsbContent.AppendLine("  </LogonCommand>");
-        wsbContent.AppendLine("</Configuration>");
+        return xml.ToString();
+    }
 
-        return wsbContent.ToString();
+    private static XElement Carpeta(string host, string guest, bool soloLectura)
+    {
+        return new XElement("MappedFolder",
+            new XElement("HostFolder", Path.GetFullPath(host)),
+            new XElement("SandboxFolder", guest),
+            new XElement("ReadOnly", soloLectura ? "true" : "false"));
     }
 }

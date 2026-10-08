@@ -11,4 +11,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>SecureGate</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SecureGate.Cliente\SecureGate.Cliente.csproj" />
+  </ItemGroup>
 </Project>

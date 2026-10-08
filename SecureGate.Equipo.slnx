@@ -7,5 +7,9 @@
     <Project Path="src/SecureGate.Proteccion/SecureGate.Proteccion.csproj" />
     <Project Path="src/SecureGate.Sandbox/SecureGate.Sandbox.csproj" />
     <Project Path="src/SecureGate.Servidor/SecureGate.Servidor.csproj" />
+    <Project Path="src/SecureGate.Cliente/SecureGate.Cliente.csproj" />
+  </Folder>
+  <Folder Name="/pruebas/">
+    <Project Path="pruebas/SecureGate.Cliente.Pruebas/SecureGate.Cliente.Pruebas.csproj" />
   </Folder>
 </Solution>
