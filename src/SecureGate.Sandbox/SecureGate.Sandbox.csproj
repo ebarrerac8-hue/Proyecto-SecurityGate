@@ -1,13 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <ItemGroup>
-    <ProjectReference Include="..\SecureGate.Contratos\SecureGate.Contratos.csproj" />
-  </ItemGroup>
+	<PropertyGroup>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<!-- Referencia compartida a Contratos -->
+	<ItemGroup>
+		<ProjectReference Include="..\SecureGate.Contratos\SecureGate.Contratos.csproj" />
+	</ItemGroup>
+
+	<!-- Copia del Observador a la carpeta de salida (bin) -->
+	<ItemGroup>
+		<None Update="Assets\Guest\Observador.ps1">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 
 </Project>
