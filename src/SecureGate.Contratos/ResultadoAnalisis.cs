@@ -4,6 +4,9 @@ public sealed class ResultadoAnalisis
 {
     public Guid AnalisisId { get; init; }
 
+    // Copia del servidor no disponible desde esta fecha; el informe permanece.
+    public DateTimeOffset? FechaEliminacionMuestraServidorUtc { get; set; }
+
     public required InformacionArchivo Archivo { get; init; }
 
     public EstadoAnalisis Estado { get; set; }

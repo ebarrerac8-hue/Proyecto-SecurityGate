@@ -525,6 +525,9 @@ public partial class Form1
         texto.AppendLine("Resumen: " + resultado.Resumen);
         texto.AppendLine("Reputación: " + resultado.Reputacion?.Detalle);
         texto.AppendLine("Código de error: " + resultado.CodigoError);
+        if (resultado.FechaEliminacionMuestraServidorUtc is { } retirada)
+            texto.AppendLine("Copia del servidor no disponible desde: " + retirada.ToString("O") +
+                ". El informe se conserva; reenviar la misma solicitud recupera este trabajo sin repetirlo.");
         if (resultado.Ia is not null)
         {
             var ia = resultado.Ia;

@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SecureGate.Contratos;
 
@@ -24,6 +24,32 @@ public sealed class RepositorioAnalisis
             "Trabajos");
 
         _logger = logger;
+    }
+
+    // Lectura completa y atómica para decidir retención. No ignorar registros corruptos.
+    public async Task<IReadOnlyList<TrabajoAnalisis>> ListarTodosAsync(CancellationToken ct = default)
+    {
+        await _control.WaitAsync(ct);
+        try
+        {
+            var trabajos = new List<TrabajoAnalisis>();
+            if (!Directory.Exists(_carpeta)) return trabajos;
+            foreach (string ruta in Directory.EnumerateFiles(_carpeta, "*.json"))
+            {
+                ct.ThrowIfCancellationRequested();
+                if ((File.GetAttributes(ruta) & FileAttributes.ReparsePoint) != 0)
+                    throw new IOException("La limpieza no lee registros enlazados.");
+                await using var archivo = File.OpenRead(ruta);
+                var trabajo = await JsonSerializer.DeserializeAsync<TrabajoAnalisis>(archivo, _json, ct)
+                    ?? throw new InvalidDataException("Registro vacío durante la limpieza.");
+                if (!Guid.TryParseExact(Path.GetFileNameWithoutExtension(ruta), "N", out var id) ||
+                    trabajo.Resultado.AnalisisId != id)
+                    throw new InvalidDataException("El identificador del registro no corresponde al archivo.");
+                trabajos.Add(trabajo);
+            }
+            return trabajos;
+        }
+        finally { _control.Release(); }
     }
 
     public async Task GuardarAsync(

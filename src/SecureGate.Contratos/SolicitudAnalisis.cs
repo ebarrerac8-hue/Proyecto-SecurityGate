@@ -1,4 +1,4 @@
-﻿namespace SecureGate.Contratos;
+namespace SecureGate.Contratos;
 
 // Datos que acompañan al archivo enviado al servidor.
 public sealed class SolicitudAnalisis
@@ -21,4 +21,6 @@ public sealed class AnalisisAceptado
         = EstadoAnalisis.Pendiente;
 
     public DateTimeOffset FechaRegistroUtc { get; init; }
+
+    public DateTimeOffset? FechaEliminacionMuestraServidorUtc { get; init; }
 }

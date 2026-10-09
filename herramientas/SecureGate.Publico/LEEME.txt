@@ -1,0 +1,24 @@
+SECUREGATE — PRUEBA PÚBLICA DE LA API
+
+Estos scripts no reemplazan el código del servidor ni la interfaz. IniciarServidorPublico carga las claves desde las variables del usuario, conserva la escucha local HTTPS y aplica 25 MiB de límite durante esa sesión. No configura la IP de red ni abre puertos.
+Instalar cloudflared mediante winget install --id Cloudflare.cloudflared --exact --source winget.
+IniciarServidorPublico.ps1 se ejecuta en la primera ventana; IniciarTunel.ps1 en la segunda. El túnel genera una dirección HTTPS temporal trycloudflare.com. Mantener ambos procesos encendidos durante la demostración.
+La API exige Bearer en todas sus rutas. IniciarTunel comprueba primero la conexión local y obtiene únicamente el certificado público mediante una conexión TLS validada por Windows. Se pasa ese certificado a cloudflared para validar el origen; no se desactiva TLS.
+Cloudflare termina TLS en su borde y retransmite por HTTPS al origen local. El tráfico pasa por ese proveedor; usar únicamente la muestra de demostración y no archivos confidenciales en esta prueba.
+No activar autenticación interactiva por email del Quick Tunnel: el cliente C# usa peticiones HTTP y no una sesión de navegador.
+
+CLIENTE DEL COMPAÑERO
+Necesita la interfaz con el cliente HTTPS autenticado de la rama trabajo/servidor, Windows y .NET 10 para ejecutarla desde el repositorio. No necesita habilitar Sandbox, abrir puertos ni tener claves de Gemini o VirusTotal; Sandbox se ejecuta en el servidor.
+Entregarle este paquete, la URL y la clave SECUREGATE_CLIENT_TOKEN por vía privada. No entregar claves de proveedores. ConfigurarClientePublico.ps1 solicita la clave sin mostrarla y verifica la API antes de guardar la configuración.
+ProbarAPI.ps1 comprueba el acceso y consulta del informe existente. Después la prueba real debe incluir el envío desde su interfaz de una muestra de demostración conocida y la recepción del nuevo informe.
+La muestra de demostración ya utilizada es cmd.exe de Windows copiado como PruebaSecureGate_CMD.exe; no ejecutarlo en el anfitrión. Preparar la copia fuera de la carpeta monitoreada y moverla al final evita que el monitor lea una copia incompleta.
+
+LÍMITES
+La URL cambia al reiniciar el túnel y deja de funcionar al detenerlo. Es una demostración con peticiones reales, no un servicio permanente. No se declara conexión entre dos equipos solamente por consultar la URL desde el servidor.
+Los informes y los trabajos permanecen en el servidor Windows. Detener el túnel no elimina los datos. La aplicación mantiene el esquema de credencial compartida del prototipo.
+Los scripts fueron revisados por sintaxis. La instalación de cloudflared, TLS y conexiones públicas se verifican en tu Windows y en el equipo del compañero.
+
+FUENTES
+https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/
+https://developers.cloudflare.com/tunnel/troubleshooting/https-origins/
+https://github.com/microsoft/winget-pkgs/tree/master/manifests/c/Cloudflare/cloudflared
