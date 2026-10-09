@@ -19,7 +19,10 @@ namespace SecureGate
         {
             // Aplicar estilo general
             this.Font = new Font("Segoe UI", 10F);
-            lblTitle.ForeColor = Color.FromArgb(17, 24, 39);
+            lblTitle.ForeColor = Color.White;
+
+            // Agregar hover effects a los botones
+            AddButtonHoverEffects();
 
             // Cargar logo si existe en la carpeta de la aplicación (varios nombres posibles)
             string[] candidates = new string[] { "logo_custom.png", "logo1.png", "logo2.png", "modulos.png", "logo.png", "shield1.png", "shield2.png" };
@@ -52,6 +55,42 @@ namespace SecureGate
                     pictureBoxIcon.Image = GenerateDefaultLogo(pictureBoxIcon.Width, pictureBoxIcon.Height);
                 }
                 catch { }
+            }
+        }
+
+        private void AddButtonHoverEffects()
+        {
+            // Preparar efectos hover para botones
+            var buttons = new[] { btnHome, btnAnalyze, btnHistory, btnReports, btnConfig };
+            foreach (var btn in buttons)
+            {
+                btn.MouseEnter += (s, e) => ButtonMouseEnter((Button)s);
+                btn.MouseLeave += (s, e) => ButtonMouseLeave((Button)s);
+            }
+        }
+
+        private void ButtonMouseEnter(Button btn)
+        {
+            if (btn == btnHome)
+            {
+                btn.BackColor = Color.FromArgb(29, 78, 216); // Azul más oscuro
+            }
+            else
+            {
+                btn.BackColor = Color.FromArgb(31, 41, 55); // Gris más oscuro
+            }
+            btn.Cursor = Cursors.Hand;
+        }
+
+        private void ButtonMouseLeave(Button btn)
+        {
+            if (btn == btnHome)
+            {
+                btn.BackColor = Color.FromArgb(37, 99, 235); // Azul base
+            }
+            else
+            {
+                btn.BackColor = Color.FromArgb(17, 24, 39); // Negro base
             }
         }
 

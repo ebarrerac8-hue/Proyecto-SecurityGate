@@ -81,7 +81,7 @@
             // 
             // panelLeft
             // 
-            panelLeft.BackColor = Color.FromArgb(245, 249, 254);
+            panelLeft.BackColor = Color.FromArgb(17, 24, 39);
             panelLeft.Controls.Add(btnConfig);
             panelLeft.Controls.Add(btnReports);
             panelLeft.Controls.Add(btnHistory);
@@ -96,78 +96,89 @@
             // 
             // btnConfig
             // 
+            btnConfig.BackColor = Color.FromArgb(17, 24, 39);
             btnConfig.Cursor = Cursors.Hand;
             btnConfig.Dock = DockStyle.Bottom;
             btnConfig.FlatAppearance.BorderSize = 0;
             btnConfig.FlatStyle = FlatStyle.Flat;
-            btnConfig.ForeColor = Color.FromArgb(45, 55, 72);
+            btnConfig.ForeColor = Color.FromArgb(209, 213, 219);
             btnConfig.Location = new Point(0, 602);
             btnConfig.Name = "btnConfig";
             btnConfig.Padding = new Padding(16, 0, 0, 0);
             btnConfig.Size = new Size(240, 48);
             btnConfig.TabIndex = 0;
-            btnConfig.Text = "Configuración";
+            btnConfig.Text = "⚙️  Configuración";
             btnConfig.TextAlign = ContentAlignment.MiddleLeft;
+            btnConfig.UseVisualStyleBackColor = false;
             btnConfig.Click += btnConfig_Click;
             // 
             // btnReports
             // 
+            btnReports.BackColor = Color.FromArgb(17, 24, 39);
             btnReports.Cursor = Cursors.Hand;
             btnReports.Dock = DockStyle.Top;
             btnReports.FlatAppearance.BorderSize = 0;
             btnReports.FlatStyle = FlatStyle.Flat;
-            btnReports.ForeColor = Color.FromArgb(45, 55, 72);
+            btnReports.ForeColor = Color.FromArgb(209, 213, 219);
             btnReports.Location = new Point(0, 234);
             btnReports.Name = "btnReports";
             btnReports.Padding = new Padding(16, 0, 0, 0);
             btnReports.Size = new Size(240, 52);
             btnReports.TabIndex = 1;
-            btnReports.Text = "Reportes";
+            btnReports.Text = "📊 Reportes";
             btnReports.TextAlign = ContentAlignment.MiddleLeft;
+            btnReports.UseVisualStyleBackColor = false;
             // 
             // btnHistory
             // 
+            btnHistory.BackColor = Color.FromArgb(17, 24, 39);
             btnHistory.Dock = DockStyle.Top;
             btnHistory.FlatStyle = FlatStyle.Flat;
+            btnHistory.ForeColor = Color.FromArgb(209, 213, 219);
             btnHistory.Location = new Point(0, 186);
             btnHistory.Name = "btnHistory";
             btnHistory.Padding = new Padding(16, 0, 0, 0);
             btnHistory.Size = new Size(240, 48);
             btnHistory.TabIndex = 2;
-            btnHistory.Text = "Historial";
+            btnHistory.Text = "📜 Historial";
             btnHistory.TextAlign = ContentAlignment.MiddleLeft;
+            btnHistory.UseVisualStyleBackColor = false;
             // 
             // btnAnalyze
             // 
+            btnAnalyze.BackColor = Color.FromArgb(17, 24, 39);
             btnAnalyze.Dock = DockStyle.Top;
             btnAnalyze.FlatStyle = FlatStyle.Flat;
+            btnAnalyze.ForeColor = Color.FromArgb(209, 213, 219);
             btnAnalyze.Location = new Point(0, 138);
             btnAnalyze.Name = "btnAnalyze";
             btnAnalyze.Padding = new Padding(16, 0, 0, 0);
             btnAnalyze.Size = new Size(240, 48);
             btnAnalyze.TabIndex = 3;
-            btnAnalyze.Text = "Analizar archivo";
+            btnAnalyze.Text = "🔍 Analizar archivo";
             btnAnalyze.TextAlign = ContentAlignment.MiddleLeft;
+            btnAnalyze.UseVisualStyleBackColor = false;
             // 
             // btnHome
             // 
-            btnHome.BackColor = Color.Transparent;
+            btnHome.BackColor = Color.FromArgb(37, 99, 235);
             btnHome.Cursor = Cursors.Hand;
             btnHome.Dock = DockStyle.Top;
             btnHome.FlatAppearance.BorderSize = 0;
             btnHome.FlatStyle = FlatStyle.Flat;
-            btnHome.ForeColor = Color.FromArgb(10, 80, 210);
+            btnHome.ForeColor = Color.White;
             btnHome.Location = new Point(0, 90);
             btnHome.Name = "btnHome";
             btnHome.Padding = new Padding(16, 0, 0, 0);
             btnHome.Size = new Size(240, 48);
             btnHome.TabIndex = 4;
-            btnHome.Text = "Inicio";
+            btnHome.Text = "🏠 Inicio";
             btnHome.TextAlign = ContentAlignment.MiddleLeft;
             btnHome.UseVisualStyleBackColor = false;
             // 
             // logoPanel
             // 
+            logoPanel.BackColor = Color.FromArgb(17, 24, 39);
             logoPanel.Controls.Add(pictureBoxLogo);
             logoPanel.Controls.Add(lblAppName);
             logoPanel.Dock = DockStyle.Top;
@@ -184,7 +195,7 @@
             pictureBoxLogo.Location = new Point(12, 20);
             pictureBoxLogo.Name = "pictureBoxLogo";
             pictureBoxLogo.Size = new Size(40, 40);
-            pictureBoxLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxLogo.SizeMode = PictureBoxSizeMode.StretchImage;
             pictureBoxLogo.TabIndex = 1;
             pictureBoxLogo.TabStop = false;
             pictureBoxLogo.Click += pictureBoxLogo_Click;
@@ -193,6 +204,7 @@
             // 
             lblAppName.AutoSize = true;
             lblAppName.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            lblAppName.ForeColor = Color.White;
             lblAppName.Location = new Point(64, 24);
             lblAppName.Name = "lblAppName";
             lblAppName.Size = new Size(142, 32);
@@ -201,7 +213,7 @@
             // 
             // panelTop
             // 
-            panelTop.BackColor = Color.White;
+            panelTop.BackColor = Color.FromArgb(37, 99, 235);
             panelTop.Controls.Add(lblTitle);
             panelTop.Dock = DockStyle.Top;
             panelTop.Location = new Point(240, 0);
@@ -213,6 +225,7 @@
             // 
             lblTitle.AutoSize = true;
             lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+            lblTitle.ForeColor = Color.White;
             lblTitle.Location = new Point(16, 15);
             lblTitle.Name = "lblTitle";
             lblTitle.Size = new Size(366, 41);
@@ -352,7 +365,7 @@
             // 
             // panelMain
             // 
-            panelMain.BackColor = Color.White;
+            panelMain.BackColor = Color.FromArgb(245, 247, 250);
             panelMain.Controls.Add(groupBoxRecent);
             panelMain.Controls.Add(dragPanel);
             panelMain.Dock = DockStyle.Fill;
@@ -366,22 +379,26 @@
             // 
             groupBoxRecent.Controls.Add(listViewRecent);
             groupBoxRecent.Dock = DockStyle.Fill;
+            groupBoxRecent.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            groupBoxRecent.ForeColor = Color.FromArgb(55, 65, 81);
             groupBoxRecent.Location = new Point(16, 316);
             groupBoxRecent.Name = "groupBoxRecent";
             groupBoxRecent.Padding = new Padding(8);
             groupBoxRecent.Size = new Size(508, 238);
             groupBoxRecent.TabIndex = 0;
             groupBoxRecent.TabStop = false;
-            groupBoxRecent.Text = "Archivos recientes";
+            groupBoxRecent.Text = "📋 Archivos recientes";
             // 
             // listViewRecent
             // 
+            listViewRecent.BackColor = Color.White;
             listViewRecent.Columns.AddRange(new ColumnHeader[] { columnHeaderName, columnHeaderPath, columnHeaderDate, columnHeaderStatus });
             listViewRecent.Dock = DockStyle.Fill;
+            listViewRecent.ForeColor = Color.FromArgb(55, 65, 81);
             listViewRecent.FullRowSelect = true;
-            listViewRecent.Location = new Point(8, 28);
+            listViewRecent.Location = new Point(8, 31);
             listViewRecent.Name = "listViewRecent";
-            listViewRecent.Size = new Size(492, 202);
+            listViewRecent.Size = new Size(492, 199);
             listViewRecent.TabIndex = 0;
             listViewRecent.UseCompatibleStateImageBehavior = false;
             listViewRecent.View = View.Details;
@@ -410,8 +427,7 @@
             // dragPanel
             // 
             dragPanel.AllowDrop = true;
-            dragPanel.BackColor = Color.FromArgb(250, 250, 252);
-            dragPanel.BorderStyle = BorderStyle.FixedSingle;
+            dragPanel.BackColor = Color.White;
             dragPanel.Controls.Add(pictureBoxIcon);
             dragPanel.Controls.Add(selectFileButton);
             dragPanel.Controls.Add(lblDrag);
@@ -437,15 +453,16 @@
             // selectFileButton
             // 
             selectFileButton.Anchor = AnchorStyles.None;
-            selectFileButton.BackColor = Color.FromArgb(10, 116, 217);
+            selectFileButton.BackColor = Color.FromArgb(37, 99, 235);
             selectFileButton.FlatAppearance.BorderSize = 0;
             selectFileButton.FlatStyle = FlatStyle.Flat;
+            selectFileButton.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             selectFileButton.ForeColor = Color.White;
             selectFileButton.Location = new Point(178, 233);
             selectFileButton.Name = "selectFileButton";
             selectFileButton.Size = new Size(160, 36);
             selectFileButton.TabIndex = 0;
-            selectFileButton.Text = "Seleccionar archivo";
+            selectFileButton.Text = "📁 Seleccionar archivo";
             selectFileButton.UseVisualStyleBackColor = false;
             selectFileButton.Click += selectFileButton_Click;
             // 
