@@ -7,8 +7,9 @@ using SecureGate.Servidor;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Acceso local durante esta etapa de desarrollo.
-builder.WebHost.UseUrls("http://127.0.0.1:5080");
+// TLS local. No se abre un puerto HTTP.
+var acceso = new AccesoCliente();
+builder.WebHost.ConfigureKestrel(k => k.ListenLocalhost(5443, e => e.UseHttps()));
 
 var opciones = builder.Configuration
     .GetSection("Servidor")
@@ -85,6 +86,7 @@ builder.Services.AddHostedService<ProcesadorAnalisis>();
 builder.Services.AddSingleton(new SemaphoreSlim(1, 1));
 
 var app = builder.Build();
+app.Use((contexto, siguiente) => acceso.ProcesarAsync(contexto, siguiente));
 
 var jsonEntrada = new JsonSerializerOptions(JsonSerializerDefaults.Web)
 {

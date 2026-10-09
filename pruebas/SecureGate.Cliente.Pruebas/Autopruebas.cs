@@ -41,7 +41,7 @@ internal static class Autopruebas
                     throw new HttpRequestException("Desconexión simulada después de leer el envío.");
                 return Respuesta(HttpStatusCode.Accepted, aceptado);
             })))
-            using (var cliente = new ClienteAnalisisHttp(http, new Uri("http://localhost:5080")))
+            using (var cliente = new ClienteAnalisisHttp(http, new Uri("https://localhost:5443"), Convert.ToBase64String(new byte[32])))
             {
                 var respuesta = await cliente.EnviarArchivoAsync(solicitud, temporal);
                 Comprobar(llamadas == 2 && respuesta.AnalisisId == aceptado.AnalisisId,
@@ -51,7 +51,7 @@ internal static class Autopruebas
 
             using (var http = new HttpClient(new Simulado((_, _) =>
                 Task.FromResult(Respuesta(HttpStatusCode.Accepted, aceptado)))))
-            using (var cliente = new ClienteAnalisisHttp(http, new Uri("http://localhost:5080")))
+            using (var cliente = new ClienteAnalisisHttp(http, new Uri("https://localhost:5443"), Convert.ToBase64String(new byte[32])))
             using (var stream = new MemoryStream(bytes))
             {
                 await cliente.EnviarAsync(solicitud, stream);
@@ -66,7 +66,7 @@ internal static class Autopruebas
                 return Task.FromResult(Respuesta(HttpStatusCode.Conflict,
                     new { codigo = "SOLICITUD_REUTILIZADA", mensaje = "Conflicto de prueba." }));
             })))
-            using (var cliente = new ClienteAnalisisHttp(http, new Uri("http://localhost:5080")))
+            using (var cliente = new ClienteAnalisisHttp(http, new Uri("https://localhost:5443"), Convert.ToBase64String(new byte[32])))
             {
                 try
                 {
@@ -86,7 +86,7 @@ internal static class Autopruebas
                 llamadas++;
                 return Task.FromResult(Respuesta(HttpStatusCode.Accepted, aceptado));
             })))
-            using (var cliente = new ClienteAnalisisHttp(http, new Uri("http://localhost:5080")))
+            using (var cliente = new ClienteAnalisisHttp(http, new Uri("https://localhost:5443"), Convert.ToBase64String(new byte[32])))
             using (var cancelar = new CancellationTokenSource())
             {
                 cancelar.Cancel();
@@ -113,7 +113,7 @@ internal static class Autopruebas
             };
             using (var http = new HttpClient(new Simulado((_, _) =>
                 Task.FromResult(Respuesta(HttpStatusCode.OK, resultado)))))
-            using (var cliente = new ClienteAnalisisHttp(http, new Uri("http://localhost:5080")))
+            using (var cliente = new ClienteAnalisisHttp(http, new Uri("https://localhost:5443"), Convert.ToBase64String(new byte[32])))
             {
                 var final = await cliente.EsperarResultadoAsync(resultado.AnalisisId);
                 Comprobar(final.Estado == EstadoAnalisis.Fallido && final.CodigoError == "SANDBOX_PRUEBA",
@@ -123,7 +123,7 @@ internal static class Autopruebas
 
             using (var http = new HttpClient(new Simulado((_, _) =>
                 Task.FromResult(Respuesta(HttpStatusCode.OK, resultado)))))
-            using (var cliente = new ClienteAnalisisHttp(http, new Uri("http://localhost:5080")))
+            using (var cliente = new ClienteAnalisisHttp(http, new Uri("https://localhost:5443"), Convert.ToBase64String(new byte[32])))
             {
                 try
                 {
@@ -145,7 +145,7 @@ internal static class Autopruebas
                     Content = new StringContent("JSON inválido")
                 });
             })))
-            using (var cliente = new ClienteAnalisisHttp(http, new Uri("http://localhost:5080")))
+            using (var cliente = new ClienteAnalisisHttp(http, new Uri("https://localhost:5443"), Convert.ToBase64String(new byte[32])))
             {
                 try
                 {

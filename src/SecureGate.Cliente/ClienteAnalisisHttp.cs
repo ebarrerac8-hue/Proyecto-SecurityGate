@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -11,29 +12,35 @@ public sealed class ClienteAnalisisHttp : IClienteAnalisis, IDisposable
 {
     private readonly HttpClient _http;
     private readonly Uri _servidor;
+    private readonly string _token;
     private readonly bool _propietarioHttp;
     private static readonly JsonSerializerOptions Json = CrearJson();
 
     public ClienteAnalisisHttp(Uri servidor)
         : this(new HttpClient(new SocketsHttpHandler
         {
-            PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            AllowAutoRedirect = false
         }) { Timeout = Timeout.InfiniteTimeSpan }, servidor, true) { }
 
     /// <summary>No modifica ni elimina el HttpClient recibido.</summary>
-    public ClienteAnalisisHttp(HttpClient http, Uri servidor)
-        : this(http, servidor, false) { }
+    public ClienteAnalisisHttp(HttpClient http, Uri servidor, string? token = null)
+        : this(http, servidor, false, token) { }
 
-    private ClienteAnalisisHttp(HttpClient http, Uri servidor, bool propietario)
+    private ClienteAnalisisHttp(HttpClient http, Uri servidor, bool propietario, string? token = null)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(servidor);
         if (!servidor.IsAbsoluteUri ||
-            servidor.Scheme is not ("http" or "https") ||
+            servidor.Scheme != "https" ||
+            !string.IsNullOrEmpty(servidor.UserInfo) ||
             !string.IsNullOrEmpty(servidor.Query) ||
             !string.IsNullOrEmpty(servidor.Fragment))
-            throw new ArgumentException("La dirección del servidor debe ser HTTP o HTTPS sin consulta ni fragmento.");
+            throw new ArgumentException("La dirección del servidor debe ser HTTPS sin credenciales, consulta ni fragmento.");
 
+        _token = (token ?? Environment.GetEnvironmentVariable("SECUREGATE_CLIENT_TOKEN") ?? "").Trim();
+        if (_token.Length != 44 || !_token.All(c => char.IsAsciiLetterOrDigit(c) || c is '+' or '/' or '='))
+            throw new InvalidOperationException("No se configuró una clave de acceso válida para SecureGate.");
         _http = http;
         _servidor = new Uri(servidor.AbsoluteUri.TrimEnd('/') + "/");
         _propietarioHttp = propietario;
@@ -171,6 +178,7 @@ public sealed class ClienteAnalisisHttp : IClienteAnalisis, IDisposable
         limite.CancelAfter(tiempo);
         try
         {
+            peticion.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
             using var respuesta = await _http.SendAsync(
                 peticion, HttpCompletionOption.ResponseHeadersRead, limite.Token);
             string texto = await LeerContenidoAsync(respuesta.Content, limite.Token);

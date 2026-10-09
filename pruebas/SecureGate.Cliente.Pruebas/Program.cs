@@ -37,7 +37,7 @@ if (guardado.Resultado.Estado is not (EstadoAnalisis.Completado or EstadoAnalisi
 if (guardado.Resultado.AnalisisLocal is null)
     throw new InvalidDataException("El registro no contiene AnalisisLocal.");
 
-using var cliente = new ClienteAnalisisHttp(new Uri("http://127.0.0.1:5080"));
+using var cliente = new ClienteAnalisisHttp(new Uri("https://localhost:5443"));
 Guid id = guardado.Resultado.AnalisisId;
 
 Console.WriteLine("PRUEBA 1: consultar el informe con el cliente C#.");
