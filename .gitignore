@@ -480,3 +480,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Salidas publicadas locales de SecureGate
+/entrega/
+/herramientas/SecureGate.Entrega/ultima-entrega-local.json
