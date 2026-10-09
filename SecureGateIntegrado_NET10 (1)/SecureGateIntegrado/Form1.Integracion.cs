@@ -23,7 +23,7 @@ public partial class Form1
     private bool _salir;
     private bool _cerrado;
     private bool _historialDisponible;
-    private string _servidor = "http://127.0.0.1:5080/";
+    private string _servidor = "https://localhost:5443/";
     private string? _carpetaMonitoreo;
     private readonly Button _reanudar = new() { Text = "Reanudar pendientes", AutoSize = true };
     private readonly Button _pausar = new() { Text = "Pausar espera", AutoSize = true, Enabled = false };
@@ -653,9 +653,14 @@ public partial class Form1
     private static string NormalizarServidor(string texto)
     {
         var uri = new Uri(texto, UriKind.Absolute);
-        if (uri.Scheme is not ("http" or "https") ||
+        // Compatibilidad con los registros locales anteriores a HTTPS.
+        if (uri.Scheme == "http" && uri.IsLoopback && uri.Port == 5080 &&
+            uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.Query) &&
+            string.IsNullOrEmpty(uri.Fragment) && string.IsNullOrEmpty(uri.UserInfo))
+            return "https://localhost:5443/";
+        if (uri.Scheme != "https" || !string.IsNullOrEmpty(uri.UserInfo) ||
             !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
-            throw new ArgumentException("Ingresá una dirección HTTP o HTTPS válida.");
+            throw new ArgumentException("Ingresá una dirección HTTPS válida.");
         return uri.AbsoluteUri.TrimEnd('/') + "/";
     }
 
@@ -690,7 +695,7 @@ public partial class Form1
 
     private sealed class AjustesCliente
     {
-        public string Servidor { get; init; } = "http://127.0.0.1:5080/";
+        public string Servidor { get; init; } = "https://localhost:5443/";
         public string? CarpetaMonitoreo { get; init; }
     }
 }
