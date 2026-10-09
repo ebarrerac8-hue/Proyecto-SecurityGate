@@ -1,4 +1,4 @@
-﻿namespace SecureGate.Contratos;
+namespace SecureGate.Contratos;
 
 public sealed class ResultadoAnalisis
 {
@@ -23,6 +23,8 @@ public sealed class ResultadoAnalisis
     public ResultadoReputacion? Reputacion { get; set; }
 
     public InformeSandbox? Sandbox { get; set; }
+
+    public InformeIa? Ia { get; set; }
 
     public string? CodigoError { get; set; }
 

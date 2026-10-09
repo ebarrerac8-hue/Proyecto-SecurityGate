@@ -65,6 +65,17 @@ builder.Services.AddSingleton<ClienteReputacion>(servicios =>
         fabrica.CreateClient("VirusTotal"),
         configuracion);
 });
+builder.Services.AddSingleton(OpcionesIa.DesdeEntorno());
+builder.Services.AddHttpClient("Gemini", cliente =>
+{
+    cliente.Timeout = Timeout.InfiniteTimeSpan;
+});
+builder.Services.AddSingleton<ClienteGemini>(servicios =>
+{
+    var fabrica = servicios.GetRequiredService<IHttpClientFactory>();
+    return new ClienteGemini(fabrica.CreateClient("Gemini"),
+        servicios.GetRequiredService<OpcionesIa>());
+});
 builder.Services.AddSingleton<ColaAnalisis>();
 builder.Services.AddHostedService<RecuperadorAnalisis>();
 builder.Services.AddSingleton<SecureGate.Contratos.IAnalizadorSandbox, SecureGate.Sandbox.GestorSandbox>();

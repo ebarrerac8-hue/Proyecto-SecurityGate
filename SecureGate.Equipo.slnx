@@ -11,5 +11,6 @@
   </Folder>
   <Folder Name="/pruebas/">
     <Project Path="pruebas/SecureGate.Cliente.Pruebas/SecureGate.Cliente.Pruebas.csproj" />
+    <Project Path="pruebas/SecureGate.Ia.Pruebas/SecureGate.Ia.Pruebas.csproj" />
   </Folder>
 </Solution>
