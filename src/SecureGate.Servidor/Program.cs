@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // TLS local. No se abre un puerto HTTP.
 var acceso = new AccesoCliente();
-builder.WebHost.ConfigureKestrel(k => k.ListenLocalhost(5443, e => e.UseHttps()));
+builder.WebHost.ConfigureKestrel(TransporteServidor.Configurar);
 
 var opciones = builder.Configuration
     .GetSection("Servidor")
@@ -21,6 +21,11 @@ if (opciones.TamanoMaximoArchivoBytes <= 0 ||
     throw new InvalidOperationException(
         "El límite de archivos debe ser mayor que cero y no superar 1 GiB.");
 }
+
+if (opciones.RetencionMuestrasDias is < 1 or > 365 ||
+    opciones.TemporalesAbandonadosHoras is < 1 or > 168 ||
+    opciones.IntervaloLimpiezaMinutos is < 5 or > 1440)
+    throw new InvalidOperationException("Revisá los plazos de retención y limpieza del servidor.");
 
 // Permitir el archivo y un margen para los datos de la solicitud.
 builder.WebHost.ConfigureKestrel(kestrel =>
@@ -84,6 +89,8 @@ builder.Services.AddHostedService<ProcesadorAnalisis>();
 
 // Coordinar el registro para evitar duplicados simultáneos.
 builder.Services.AddSingleton(new SemaphoreSlim(1, 1));
+builder.Services.AddSingleton<LimpiadorDatos>();
+builder.Services.AddHostedService<ServicioLimpieza>();
 
 var app = builder.Build();
 app.Use((contexto, siguiente) => acceso.ProcesarAsync(contexto, siguiente));
@@ -411,6 +418,7 @@ static AnalisisAceptado CrearRespuesta(TrabajoAnalisis trabajo)
         AnalisisId = trabajo.Resultado.AnalisisId,
         ArchivoId = trabajo.Resultado.Archivo.ArchivoId,
         Estado = trabajo.Resultado.Estado,
-        FechaRegistroUtc = trabajo.Resultado.FechaCreacionUtc
+        FechaRegistroUtc = trabajo.Resultado.FechaCreacionUtc,
+        FechaEliminacionMuestraServidorUtc = trabajo.Resultado.FechaEliminacionMuestraServidorUtc
     };
 }
