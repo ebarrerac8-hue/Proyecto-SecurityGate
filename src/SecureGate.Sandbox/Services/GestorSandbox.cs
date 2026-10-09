@@ -55,9 +55,24 @@ public sealed class GestorSandbox : IAnalizadorSandbox
                     "Hay otra sesión de Windows Sandbox abierta. Ciérrela antes de la prueba.",
                     EstadoComprobacion.NoDisponible);
 
-            if (!VerificadorEntorno.VerificarRecursosSuficientes())
+            // Espera limitada para liberar memoria entre sesiones.
+            var esperaMemoria = Stopwatch.StartNew();
+            bool memoriaDisponible =
+                VerificadorEntorno.VerificarRecursosSuficientes();
+
+            while (!memoriaDisponible &&
+                   esperaMemoria.Elapsed < TimeSpan.FromSeconds(45))
+            {
+                await Task.Delay(500, cancellationToken);
+                memoriaDisponible =
+                    VerificadorEntorno.VerificarRecursosSuficientes();
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!memoriaDisponible)
                 return Fallo(informe, "SANDBOX_RECURSOS_INSUFICIENTES",
-                    "Se requieren al menos 2 GiB de memoria física disponible para esta prueba.",
+                    "No hubo al menos 2 GiB disponibles tras esperar hasta 45 segundos.",
                     EstadoComprobacion.NoDisponible);
 
             string observador = Path.Combine(AppContext.BaseDirectory,
