@@ -32,6 +32,7 @@ public partial class Form1
     private readonly Button _reintentar = new() { Text = "🔁 Reintentar", AutoSize = true, Enabled = false };
     private readonly Button _eliminar = new() { Text = "🗑️  Eliminar", AutoSize = true, Enabled = false };
     private readonly Button _liberar = new() { Text = "📋 Liberar", AutoSize = true, Enabled = false };
+    private readonly Button _exportar = new() { Text = "📥 Exportar TXT", AutoSize = true, Enabled = false };
     private static readonly JsonSerializerOptions JsonInforme = CrearJsonInforme();
     private static readonly HashSet<string> ExtensionesServidor = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -84,7 +85,7 @@ public partial class Form1
         };
 
         // Aplicar estilos a los botones
-        foreach (var btn in new[] { _reanudar, _pausar, _reintentar, _eliminar, _liberar })
+        foreach (var btn in new[] { _reanudar, _pausar, _reintentar, _eliminar, _liberar, _exportar })
         {
             btn.Height = 38;
             btn.Font = new Font("Segoe UI", 9F);
@@ -95,7 +96,7 @@ public partial class Form1
             btn.Margin = new Padding(4);
         }
 
-        acciones.Controls.AddRange(new Control[] { _reanudar, _pausar, _reintentar, _eliminar, _liberar });
+        acciones.Controls.AddRange(new Control[] { _reanudar, _pausar, _reintentar, _eliminar, _liberar, _exportar });
         panelRight.Controls.Add(acciones);
         panelRight.Controls.SetChildIndex(acciones, 0);
 
@@ -105,6 +106,7 @@ public partial class Form1
         _reintentar.Click += async (_, _) => await ReiniciarAnalisisAsync();
         _eliminar.Click += async (_, _) => await EliminarArchivoAsync();
         _liberar.Click += async (_, _) => await LiberarArchivoAsync();
+        _exportar.Click += (_, _) => ExportarInforme();
         btnConfigureSandbox.Click += (_, _) => MostrarInforme();
         lblSandboxTitle.Text = "Seleccioná un archivo";
         lblSandboxStatus.Text =
@@ -554,6 +556,7 @@ public partial class Form1
         _pausar.Enabled = enProceso;
         _reintentar.Enabled = (fallido || completado) && !enProceso;
         _eliminar.Enabled = !enProceso && (completado || fallido);
+        _exportar.Enabled = true;
         _liberar.Enabled = completado && envio.Resultado?.Evaluacion == EvaluacionRiesgo.SinIndicadoresDetectados;
     }
 
