@@ -525,6 +525,24 @@ public partial class Form1
         texto.AppendLine("Resumen: " + resultado.Resumen);
         texto.AppendLine("Reputación: " + resultado.Reputacion?.Detalle);
         texto.AppendLine("Código de error: " + resultado.CodigoError);
+        if (resultado.Ia is not null)
+        {
+            var ia = resultado.Ia;
+            texto.AppendLine("\nEXPLICACIÓN DE IA — APOYO, SIN AUTORIZACIÓN DE EJECUCIÓN");
+            texto.AppendLine($"Proveedor: {ia.Proveedor}; modelo: {ia.Modelo}; estado: {ia.Estado}");
+            texto.AppendLine($"Consulta: {ia.FechaConsultaUtc:o}; finalización: {ia.FechaFinalizacionUtc:o}");
+            texto.AppendLine("Código de error IA: " + ia.CodigoError);
+            texto.AppendLine(ia.Resumen);
+            texto.AppendLine("Referencias del resumen: " + string.Join(", ", ia.ReferenciasResumen));
+            foreach (var observacion in ia.Observaciones)
+                texto.AppendLine("- " + observacion.Texto + " [" +
+                    string.Join(", ", observacion.Referencias) + "]");
+            texto.AppendLine("\nLIMITACIONES DE IA");
+            foreach (string limitacion in ia.Limitaciones) texto.AppendLine("- " + limitacion);
+            texto.AppendLine("\nEVIDENCIAS ENVIADAS A IA");
+            foreach (var evidencia in ia.EvidenciasEnviadas)
+                texto.AppendLine($"{evidencia.Id} | {evidencia.Tipo} | {evidencia.Descripcion}");
+        }
         texto.AppendLine("\nMOTIVOS");
         foreach (string motivo in resultado.Motivos) texto.AppendLine("- " + motivo);
         texto.AppendLine("\nLIMITACIONES");
