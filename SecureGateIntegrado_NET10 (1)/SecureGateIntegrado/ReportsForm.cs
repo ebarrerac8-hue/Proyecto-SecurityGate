@@ -137,7 +137,13 @@ namespace SecureGate
             btnClose.Click += (_, _) => Close();
             btnClose.Margin = new Padding(8, 0, 0, 0);
 
-            var flowActions = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.RightToLeft, AutoSize = true };
+            var flowActions = new FlowLayoutPanel 
+            { 
+                Dock = DockStyle.Right, 
+                FlowDirection = FlowDirection.RightToLeft, 
+                AutoSize = true, 
+                WrapContents = false // CRUCIAL para evitar que baje el boton de exportar
+            };
             flowActions.Controls.Add(btnClose);
             flowActions.Controls.Add(_exportBtn);
 
