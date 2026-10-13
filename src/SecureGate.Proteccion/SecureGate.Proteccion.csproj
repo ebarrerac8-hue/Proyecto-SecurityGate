@@ -1,7 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\SecureGate.Contratos\SecureGate.Contratos.csproj" />
+    <ProjectReference Include="..\SecureGate.Cliente\SecureGate.Cliente.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

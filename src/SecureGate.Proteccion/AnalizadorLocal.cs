@@ -1,94 +1,34 @@
-﻿using System;
-using System.IO;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading;
-using System.Threading.Tasks;
 using SecureGate.Contratos;
 
-namespace SecureGate.Proteccion
+namespace SecureGate.Proteccion;
+
+public sealed class AnalizadorLocal : IAnalizadorLocal
 {
-    public class AnalizadorLocal : IAnalizadorLocal
+    private readonly AlmacenCuarentena _almacen;
+    public AnalizadorLocal() : this(null) { }
+    public AnalizadorLocal(string? carpeta) => _almacen = new(carpeta);
+
+    public async Task<ResultadoAnalisisLocal> AnalizarAsync(Guid archivoId,
+        CancellationToken cancellationToken = default)
     {
-        public Task<ResultadoAnalisisLocal> AnalizarAsync(Guid archivoId, CancellationToken cancellationToken = default)
+        var inicio = DateTimeOffset.UtcNow;
+        await using var sesion = await _almacen.AbrirSesionAsync(cancellationToken);
+        var r = await _almacen.RecuperarAsync(archivoId, cancellationToken);
+        if (r.Estado != EstadoArchivo.Retenido)
+            throw new InvalidOperationException("El archivo no esta retenido para analizar.");
+        var firma = await VerificadorFirmaDigital.VerificarAsync(
+            _almacen.Muestra(archivoId), r.Extension, cancellationToken);
+        await _almacen.ValidarAsync(r, cancellationToken);
+        return new ResultadoAnalisisLocal
         {
-            return Task.Run(() =>
+            Archivo = r.Informacion(), InicioUtc = inicio, FinUtc = DateTimeOffset.UtcNow,
+            FirmaDigital = firma,
+            Antivirus = new ResultadoAntivirus
             {
-                string directorioCuarentena = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "SecureGate",
-                    "Cuarentena"
-                );
-                string rutaArchivo = Path.Combine(directorioCuarentena, $"{archivoId}.bytes");
-
-                if (!File.Exists(rutaArchivo))
-                {
-                    throw new FileNotFoundException($"No se encontró el archivo con ID {archivoId}");
-                }
-
-                var fileInfo = new FileInfo(rutaArchivo);
-                var hashSha256 = CalcularSha256(rutaArchivo);
-
-                var archivoInfo = new InformacionArchivo
-                {
-                    ArchivoId = archivoId,
-                    NombreOriginal = fileInfo.Name,
-                    Extension = fileInfo.Extension.ToLower(),
-                    TamanoBytes = fileInfo.Length,
-                    Sha256 = hashSha256,
-                    FechaRegistroUtc = DateTimeOffset.UtcNow
-                };
-
-                bool firmaValida = VerificarFirmaDigital(rutaArchivo);
-
-                var resultado = new ResultadoAnalisisLocal
-                {
-                    Archivo = archivoInfo,
-                    InicioUtc = DateTimeOffset.UtcNow,
-
-                    FirmaDigital = new ResultadoFirmaDigital
-                    {
-                        Estado = EstadoComprobacion.Completada,
-                        Firma = firmaValida ? EstadoFirmaDigital.Valida : EstadoFirmaDigital.Invalida
-                    },
-
-                    Antivirus = new ResultadoAntivirus
-                    {
-                        Estado = EstadoComprobacion.NoRealizada,
-                        Deteccion = DeteccionAntivirus.NoDeterminada,
-                        Detalle = "Análisis antivirus local no implementado"
-                    },
-
-                    FinUtc = DateTimeOffset.UtcNow
-                };
-
-                return resultado;
-
-            }, cancellationToken);
-        }
-
-        private string CalcularSha256(string ruta)
-        {
-            using (var sha256 = SHA256.Create())
-            using (var stream = File.OpenRead(ruta))
-            {
-                byte[] hash = sha256.ComputeHash(stream);
-                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                Estado = EstadoComprobacion.NoRealizada,
+                Deteccion = DeteccionAntivirus.NoDeterminada,
+                Detalle = "Integracion con Microsoft Defender pendiente."
             }
-        }
-
-        private bool VerificarFirmaDigital(string ruta)
-        {
-            try
-            {
-                var cert = X509Certificate.CreateFromSignedFile(ruta);
-                var cert2 = new X509Certificate2(cert);
-                return cert2.Verify();
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        };
     }
 }
