@@ -1,14 +1,26 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SecureGate.Contratos;
 
 namespace SecureGate.Proteccion
 {
+    // Esta clase interna nos sirve para guardar la memoria en el disco
+    public class RegistroArchivoEnCuarentena
+    {
+        public Guid ArchivoId { get; set; }
+        public string RutaOriginal { get; set; } = string.Empty;
+    }
+
     public class GestorCuarentena : IGestorCuarentena
     {
         private readonly string _directorioCuarentena;
+        private readonly string _rutaRegistro;
+        private ConcurrentDictionary<Guid, RegistroArchivoEnCuarentena> _registro;
 
         public GestorCuarentena()
         {
@@ -17,11 +29,34 @@ namespace SecureGate.Proteccion
                 "SecureGate",
                 "Cuarentena"
             );
+            _rutaRegistro = Path.Combine(_directorioCuarentena, "registro_cuarentena.json");
 
             if (!Directory.Exists(_directorioCuarentena))
             {
                 Directory.CreateDirectory(_directorioCuarentena);
             }
+
+            CargarRegistro();
+        }
+
+        private void CargarRegistro()
+        {
+            if (File.Exists(_rutaRegistro))
+            {
+                string json = File.ReadAllText(_rutaRegistro);
+                _registro = JsonSerializer.Deserialize<ConcurrentDictionary<Guid, RegistroArchivoEnCuarentena>>(json)
+                            ?? new ConcurrentDictionary<Guid, RegistroArchivoEnCuarentena>();
+            }
+            else
+            {
+                _registro = new ConcurrentDictionary<Guid, RegistroArchivoEnCuarentena>();
+            }
+        }
+
+        private void GuardarRegistro()
+        {
+            string json = JsonSerializer.Serialize(_registro, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(_rutaRegistro, json);
         }
 
         public Task<ResultadoOperacionArchivo> RetenerAsync(string rutaArchivo, CancellationToken cancellationToken = default)
@@ -33,14 +68,31 @@ namespace SecureGate.Proteccion
 
                 Guid nuevoId = Guid.NewGuid();
                 string rutaCuarentena = Path.Combine(_directorioCuarentena, $"{nuevoId}.bytes");
-                File.Move(rutaArchivo, rutaCuarentena);
+
+                // BLOQUEO CRÍTICO: Abrimos el archivo con FileShare.None para que nadie más pueda usarlo/ejecutarlo
+                using (var sourceStream = new FileStream(rutaArchivo, FileMode.Open, FileAccess.Read, FileShare.None))
+                using (var destStream = new FileStream(rutaCuarentena, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    sourceStream.CopyTo(destStream);
+                }
+
+                // Si la copia con bloqueo fue exitosa, eliminamos el original
+                File.Delete(rutaArchivo);
+
+                // Guardamos en la memoria (persistencia para reinicios)
+                _registro.TryAdd(nuevoId, new RegistroArchivoEnCuarentena
+                {
+                    ArchivoId = nuevoId,
+                    RutaOriginal = rutaArchivo
+                });
+                GuardarRegistro();
 
                 return new ResultadoOperacionArchivo
                 {
                     ArchivoId = nuevoId,
                     Realizada = true,
                     EstadoActual = EstadoArchivo.Retenido,
-                    Mensaje = $"Archivo movido a cuarentena exitosamente."
+                    Mensaje = "Archivo retenido y bloqueado exitosamente."
                 };
             }, cancellationToken);
         }
@@ -58,12 +110,17 @@ namespace SecureGate.Proteccion
                     eliminado = true;
                 }
 
+                if (_registro.TryRemove(archivoId, out _))
+                {
+                    GuardarRegistro();
+                }
+
                 return new ResultadoOperacionArchivo
                 {
                     ArchivoId = archivoId,
                     Realizada = eliminado,
                     EstadoActual = eliminado ? EstadoArchivo.Eliminado : EstadoArchivo.NoDeterminado,
-                    Mensaje = eliminado ? "Archivo eliminado de cuarentena." : "Archivo no encontrado."
+                    Mensaje = eliminado ? "Archivo eliminado permanentemente." : "Archivo no encontrado."
                 };
             }, cancellationToken);
         }
@@ -73,28 +130,49 @@ namespace SecureGate.Proteccion
             return Task.Run(() =>
             {
                 string rutaCuarentena = Path.Combine(_directorioCuarentena, $"{solicitud.ArchivoId}.bytes");
-                bool liberado = false;
 
-                // Nota: Idealmente aquí se pediría la ruta original donde restaurarlo. 
-                // Por ahora lo simulamos moviéndolo a una subcarpeta "Liberados"
-                string dirLiberados = Path.Combine(_directorioCuarentena, "Liberados");
-                if (!Directory.Exists(dirLiberados)) Directory.CreateDirectory(dirLiberados);
-
-                if (File.Exists(rutaCuarentena))
+                if (!File.Exists(rutaCuarentena) || !_registro.TryGetValue(solicitud.ArchivoId, out var datosOriginales))
                 {
-                    string rutaDestino = Path.Combine(dirLiberados, $"{solicitud.ArchivoId}_liberado.bin");
-                    File.Move(rutaCuarentena, rutaDestino);
-                    liberado = true;
+                    return new ResultadoOperacionArchivo
+                    {
+                        ArchivoId = solicitud.ArchivoId,
+                        Realizada = false,
+                        EstadoActual = EstadoArchivo.Retenido,
+                        Mensaje = "No se encontró el archivo o su registro original."
+                    };
                 }
+
+                // VALIDACIÓN DE SEGURIDAD: Verificar el SHA-256 antes de liberar
+                string hashActual = CalcularSha256(rutaCuarentena);
+                if (!hashActual.Equals(solicitud.Sha256Esperado, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Alerta de Seguridad: El hash del archivo en cuarentena no coincide con el esperado.");
+                }
+
+                // Restaurar a la ubicación original exacta
+                File.Move(rutaCuarentena, datosOriginales.RutaOriginal);
+
+                _registro.TryRemove(solicitud.ArchivoId, out _);
+                GuardarRegistro();
 
                 return new ResultadoOperacionArchivo
                 {
                     ArchivoId = solicitud.ArchivoId,
-                    Realizada = liberado,
-                    EstadoActual = liberado ? EstadoArchivo.Liberado : EstadoArchivo.Retenido,
-                    Mensaje = liberado ? "Archivo liberado exitosamente." : "Error al liberar archivo."
+                    Realizada = true,
+                    EstadoActual = EstadoArchivo.Liberado,
+                    Mensaje = $"Archivo restaurado exitosamente en {datosOriginales.RutaOriginal}"
                 };
             }, cancellationToken);
+        }
+
+        private string CalcularSha256(string ruta)
+        {
+            using (var sha256 = SHA256.Create())
+            using (var stream = File.OpenRead(ruta))
+            {
+                byte[] hash = sha256.ComputeHash(stream);
+                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            }
         }
     }
 }
