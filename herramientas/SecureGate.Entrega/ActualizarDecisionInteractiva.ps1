@@ -1,16 +1,21 @@
 param(
     [string]$Proyecto = (Get-Location).Path,
-    [Parameter(Mandatory=$true)][string]$Entrega
+    [Parameter(Mandatory=$true)][string]$Entrega,
+    [switch]$SoloCliente
 )
 $ErrorActionPreference = 'Stop'
 $Proyecto = (Resolve-Path -LiteralPath $Proyecto).Path
 $Entrega = (Resolve-Path -LiteralPath $Entrega).Path
-foreach ($ruta in @('Cliente\SecureGateIntegrado.exe','Servidor\SecureGate.Servidor.exe')) {
+$componentes = if ($SoloCliente) { @('Cliente') } else { @('Cliente','Servidor') }
+$rutasRequeridas = @('Cliente\SecureGateIntegrado.exe')
+if (!$SoloCliente) { $rutasRequeridas += 'Servidor\SecureGate.Servidor.exe' }
+foreach ($ruta in $rutasRequeridas) {
     if (!(Test-Path -LiteralPath (Join-Path $Entrega $ruta))) { throw "No es la entrega esperada: falta $ruta." }
 }
-foreach ($proceso in @(Get-Process -Name SecureGateIntegrado,SecureGate.Servidor -ErrorAction SilentlyContinue)) {
+$nombresProcesos = if ($SoloCliente) { @('SecureGateIntegrado') } else { @('SecureGateIntegrado','SecureGate.Servidor') }
+foreach ($proceso in @(Get-Process -Name $nombresProcesos -ErrorAction SilentlyContinue)) {
     if ($proceso.Path -and $proceso.Path.StartsWith($Entrega + '\', [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Cierra el cliente con Salir y detén el servidor de esta entrega antes de actualizar. No se modificó la publicación.'
+        throw 'Cierre las aplicaciones que se van a actualizar antes de continuar. No se modificó la publicación.'
     }
 }
 Push-Location -LiteralPath $Proyecto
@@ -25,10 +30,11 @@ try {
         @{Nombre='Cliente'; Proyecto='SecureGateIntegrado_NET10 (1)\SecureGateIntegrado\SecureGateIntegrado.csproj'},
         @{Nombre='Servidor'; Proyecto='src\SecureGate.Servidor\SecureGate.Servidor.csproj'}
     )) {
+        if ($SoloCliente -and $item.Nombre -eq 'Servidor') { continue }
         & dotnet publish $item.Proyecto -c Release -r win-x64 --self-contained true -o (Join-Path $publicacion $item.Nombre)
         if ($LASTEXITCODE -ne 0) { throw "No se pudo publicar $($item.Nombre). La entrega no se modificó." }
     }
-    if (!(Test-Path -LiteralPath (Join-Path $publicacion 'Servidor\Assets\Guest\Observador.ps1'))) {
+    if (!$SoloCliente -and !(Test-Path -LiteralPath (Join-Path $publicacion 'Servidor\Assets\Guest\Observador.ps1'))) {
         throw 'Falta el observador Sandbox. La entrega no se modificó.'
     }
     foreach ($archivo in Get-ChildItem -LiteralPath $publicacion -Recurse -File) {
@@ -48,7 +54,7 @@ try {
     $candidato = Join-Path $Entrega ('ActualizacionDecision_' + $id)
     $respaldo = Join-Path $Entrega ('RespaldoDecision_' + $id)
     New-Item -ItemType Directory -Path $candidato,$respaldo | Out-Null
-    foreach ($nombre in @('Cliente','Servidor')) {
+    foreach ($nombre in $componentes) {
         # Preservar lanzadores, accesos y archivos auxiliares de la distribución anterior.
         Copy-Item -LiteralPath (Join-Path $Entrega $nombre) -Destination $candidato -Recurse
         Copy-Item -Path (Join-Path (Join-Path $publicacion $nombre) '*') -Destination (Join-Path $candidato $nombre) -Recurse -Force
@@ -70,12 +76,12 @@ try {
         }
     }
     # Crear paquetes nuevos antes de cambiar las carpetas de los accesos existentes.
-    foreach ($nombre in @('Cliente','Servidor')) {
+    foreach ($nombre in $componentes) {
         Compress-Archive -LiteralPath (Join-Path $candidato $nombre) -DestinationPath (Join-Path $candidato ('SecureGate_' + $nombre + '_Actualizado.zip'))
     }
     $movidos = [Collections.Generic.List[string]]::new()
     try {
-        foreach ($nombre in @('Cliente','Servidor')) {
+        foreach ($nombre in $componentes) {
             Move-Item -LiteralPath (Join-Path $Entrega $nombre) -Destination $respaldo
             $movidos.Add($nombre)
             Move-Item -LiteralPath (Join-Path $candidato $nombre) -Destination $Entrega
@@ -89,13 +95,14 @@ try {
         throw 'No se completó la actualización. Se restauraron las carpetas anteriores.'
     }
     Copy-Item -LiteralPath (Join-Path $Proyecto 'README.md') -Destination (Join-Path $Entrega 'ALCANCE_ACTUAL.md') -Force
-    foreach ($nombre in @('Cliente','Servidor')) {
+    foreach ($nombre in $componentes) {
         $zip = 'SecureGate_' + $nombre + '_Actualizado.zip'
         if (Test-Path -LiteralPath (Join-Path $Entrega $zip)) { Move-Item -LiteralPath (Join-Path $Entrega $zip) -Destination $respaldo }
         Move-Item -LiteralPath (Join-Path $candidato $zip) -Destination $Entrega
     }
-    Write-Host 'CORRECTO: cliente y servidor actualizados; lanzadores y rutas conservados.'
+    Write-Host ('CORRECTO: publicación actualizada: ' + ($componentes -join ', ') + '. Lanzadores y rutas conservados.')
     Write-Host "Respaldo: $respaldo"
-    Write-Host 'Inicia manualmente servidor, túnel y cliente. La prueba real del cuadro requiere una nueva descarga .exe.'
+    if ($SoloCliente) { Write-Host 'Abra el cliente con su acceso habitual. Puede revisar el informe guardado sin repetir el análisis.' }
+    else { Write-Host 'Inicie manualmente servidor, túnel y cliente.' }
     Write-Host ('Paquete para compañeros: ' + (Join-Path $Entrega 'SecureGate_Cliente_Actualizado.zip'))
 } finally { Pop-Location }
