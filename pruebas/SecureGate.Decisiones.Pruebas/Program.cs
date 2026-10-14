@@ -196,6 +196,21 @@ internal static class Program
         Application.DoEvents();
         Capturar(confirmar, "ConfirmacionRiesgo");
         confirmar.Close();
+        using var fuenteGrande = new Font(SystemFonts.MessageBoxFont!.FontFamily, 14F);
+        using var textoGrande = new DecisionArchivoForm("PruebaTextoGrande.exe", TipoResultadoDecision.SinAmenazasReportadas, () => { })
+            { Font = fuenteGrande };
+        using var temporizador = new System.Windows.Forms.Timer { Interval = 50 };
+        temporizador.Tick += (_, _) => { temporizador.Stop(); textoGrande.Close(); };
+        textoGrande.Shown += (_, _) =>
+        {
+            var botones = Controles(textoGrande).OfType<Button>().ToArray();
+            Exigir(botones.Select(b => b.Size).Distinct().Count() == 1 && botones.Select(b => b.Top).Distinct().Count() == 1 &&
+                botones.All(b => b.Width >= TextRenderer.MeasureText(b.Text, b.Font, Size.Empty,
+                    TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width + 16),
+                "texto grande de Windows conserva rótulos completos y botones iguales en una fila.");
+            Capturar(textoGrande, "TextoGrande"); temporizador.Start();
+        };
+        textoGrande.ShowDialog();
     }
 
     private static void Capturar(Form ventana, string nombre)

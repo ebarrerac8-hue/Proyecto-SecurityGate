@@ -65,6 +65,35 @@ internal static class EstiloDialogoArchivo
             Padding = new Padding(20, 12, 20, 12), Margin = Padding.Empty, BackColor = SystemColors.Control };
         foreach (var boton in botones.Reverse()) pie.Controls.Add(boton);
         raiz.RowStyles.Add(new RowStyle(SizeType.AutoSize)); raiz.Controls.Add(pie);
+        bool ajustando = false;
+        void AjustarBotones()
+        {
+            if (ajustando || ventana.IsDisposed) return;
+            ajustando = true;
+            try
+            {
+                var acciones = pie.Controls.OfType<Button>().ToArray();
+                if (acciones.Length == 0) return;
+                float escala = ventana.DeviceDpi / 96f;
+                var medidas = acciones.Select(b => TextRenderer.MeasureText(b.Text, b.Font,
+                    Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPadding)).ToArray();
+                int ancho = Math.Max((int)Math.Ceiling(140 * escala),
+                    medidas.Max(m => m.Width) + (int)Math.Ceiling(24 * escala));
+                int alto = Math.Max((int)Math.Ceiling(30 * escala),
+                    medidas.Max(m => m.Height) + (int)Math.Ceiling(10 * escala));
+                foreach (var boton in acciones)
+                    if (boton.Size != new Size(ancho, alto)) boton.Size = new Size(ancho, alto);
+                int requerido = acciones.Sum(b => b.Width + b.Margin.Horizontal) + pie.Padding.Horizontal;
+                var minimo = new Size(Math.Max((int)Math.Ceiling(640 * escala), requerido), 0);
+                if (raiz.MinimumSize != minimo) raiz.MinimumSize = minimo;
+            }
+            finally { ajustando = false; }
+        }
+        pie.Layout += (_, _) => AjustarBotones();
+        ventana.FontChanged += (_, _) => AjustarBotones();
+        ventana.Shown += (_, _) => AjustarBotones();
+        ventana.DpiChanged += (_, _) => AjustarBotones();
+        AjustarBotones();
     }
 }
 

@@ -121,7 +121,7 @@ public partial class Form1
         var ayuda = new ToolTip(components);
         ayuda.SetToolTip(_pausar, "Detiene la espera del cliente. El trabajo del servidor puede continuar.");
         ayuda.SetToolTip(_reintentar, "Consulta el mismo trabajo; no crea un análisis nuevo.");
-        _liberar.Text = "Liberar con autorización";
+        _liberar.Text = "Decidir sobre archivo…";
         contenido.Controls.Add(acciones, 0, 1);
 
         groupBoxSummary.Text = "Datos del archivo";
