@@ -17,6 +17,11 @@ public sealed class RegistroCuarentena
     public DateTimeOffset FechaActualizacionUtc { get; set; }
     public string? SddlOriginal { get; set; }
     public bool PermisosAplicados { get; set; }
+    public Guid? AnalisisLiberacionId { get; set; }
+    public string? UsuarioLiberacionSid { get; set; }
+    public DateTimeOffset? FechaAutorizacionLiberacionUtc { get; set; }
+    public EvaluacionRiesgo? EvaluacionAlLiberar { get; set; }
+    public string? MetodoAutorizacion { get; set; }
     public EstadoArchivo Estado { get; set; }
     public string OperacionPendiente { get; set; } = "Retener";
 
@@ -82,7 +87,7 @@ internal sealed class AlmacenCuarentena
             !Enum.IsDefined(r.Estado) ||
             r.Extension != Path.GetExtension(r.NombreOriginal) ||
             (r.OperacionPendiente != "" && r.OperacionPendiente != "Retener" &&
-             r.OperacionPendiente != "Eliminar"))
+             r.OperacionPendiente != "Eliminar" && r.OperacionPendiente != "Liberar"))
             throw new InvalidDataException("Registro de cuarentena inconsistente.");
         return r;
     }
@@ -133,6 +138,11 @@ internal sealed class AlmacenCuarentena
         var r = Leer(id);
         string muestra = Muestra(id);
         ComprobarRuta(muestra);
+        if (r.OperacionPendiente == "Liberar")
+        {
+            await CompletarLiberacionAsync(r, ct);
+            return r;
+        }
         if (r.OperacionPendiente == "Retener" && !File.Exists(muestra))
         {
             ComprobarRuta(r.RutaOriginal);
@@ -182,4 +192,38 @@ internal sealed class AlmacenCuarentena
         }
         return r;
     }
+
+    internal async Task CompletarLiberacionAsync(RegistroCuarentena r, CancellationToken ct)
+    {
+        using var identidad = System.Security.Principal.WindowsIdentity.GetCurrent();
+        if (r.AnalisisLiberacionId is null || r.AnalisisLiberacionId == Guid.Empty ||
+            r.UsuarioLiberacionSid != identidad.User?.Value ||
+            r.FechaAutorizacionLiberacionUtc is null || r.MetodoAutorizacion != "CredUI+LogonUser" ||
+            r.EvaluacionAlLiberar is null || !Enum.IsDefined(r.EvaluacionAlLiberar.Value) ||
+            r.EvaluacionAlLiberar == EvaluacionRiesgo.AmenazaDetectada || string.IsNullOrWhiteSpace(r.SddlOriginal))
+            throw new UnauthorizedAccessException("Falta el registro de autorizacion de liberacion.");
+        PermisosCuarentena.ValidarOrigen(r.RutaOriginal, Carpeta);
+        string muestra = Muestra(r.ArchivoId);
+        if (File.Exists(muestra))
+        {
+            await ValidarAsync(r, ct);
+            if (File.Exists(r.RutaOriginal) || Directory.Exists(r.RutaOriginal))
+                throw new IOException("La ubicacion original esta ocupada. No se sobrescribio ningun archivo.");
+            if (!Directory.Exists(Path.GetDirectoryName(r.RutaOriginal)))
+                throw new DirectoryNotFoundException("La carpeta original ya no existe.");
+            ct.ThrowIfCancellationRequested();
+            File.Move(muestra, r.RutaOriginal, overwrite: false);
+        }
+        if (!File.Exists(r.RutaOriginal) || new FileInfo(r.RutaOriginal).Length != r.TamanoBytes ||
+            !string.Equals(await HashAsync(r.RutaOriginal, ct), r.Sha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("El archivo que se va a liberar no coincide con el registro.");
+        // La muestra continua sin ejecucion directa hasta restaurar la DACL original.
+        PermisosCuarentena.RestaurarAcceso(r.RutaOriginal, r.SddlOriginal);
+        r.Estado = EstadoArchivo.Liberado;
+        r.PermisosAplicados = false;
+        r.OperacionPendiente = "";
+        r.FechaActualizacionUtc = DateTimeOffset.UtcNow;
+        Guardar(r);
+    }
 }
+

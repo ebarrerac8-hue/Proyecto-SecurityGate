@@ -104,6 +104,34 @@ public sealed class GestorCuarentena : IGestorCuarentena
             "Liberacion deshabilitada hasta integrar autorizacion y evaluacion verificables.",
             "LIBERACION_NO_AUTORIZADA");
     }
+    public async Task<ResultadoOperacionArchivo> LiberarAutorizadoAsync(
+        AutorizacionLiberacion autorizacion, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(autorizacion);
+        await using var sesion = await _almacen.AbrirSesionAsync(ct);
+        var r = await _almacen.RecuperarAsync(autorizacion.ArchivoId, ct);
+        if (r.Estado != EstadoArchivo.Retenido)
+            return Resultado(r, false, "La muestra ya no esta retenida.", "ESTADO_NO_ADMITIDO");
+        await _almacen.ValidarAsync(r, ct);
+        PermisosCuarentena.ValidarOrigen(r.RutaOriginal, _almacen.Carpeta);
+        if (File.Exists(r.RutaOriginal) || Directory.Exists(r.RutaOriginal))
+            return Resultado(r, false, "La ubicacion original esta ocupada.", "DESTINO_OCUPADO");
+        autorizacion.Consumir(r);
+        r.AnalisisLiberacionId = autorizacion.AnalisisId;
+        r.UsuarioLiberacionSid = autorizacion.UsuarioSid;
+        r.FechaAutorizacionLiberacionUtc = autorizacion.FechaUtc;
+        r.EvaluacionAlLiberar = autorizacion.Evaluacion;
+        r.MetodoAutorizacion = "CredUI+LogonUser";
+        r.OperacionPendiente = "Liberar";
+        _almacen.Guardar(r); // Autorizar y registrar antes del movimiento recuperable.
+        await _almacen.CompletarLiberacionAsync(r, ct);
+        return Resultado(r, true, "Archivo restaurado bajo responsabilidad del usuario. No se ejecuto ni cambio su evaluacion.");
+    }
+    public async Task<RegistroCuarentena> ConsultarRegistroAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var sesion = await _almacen.AbrirSesionAsync(ct);
+        return await _almacen.RecuperarAsync(id, ct);
+    }
     private static ResultadoOperacionArchivo Resultado(RegistroCuarentena r, bool realizada,
         string mensaje, string? codigo = null) => new()
     {
@@ -111,3 +139,4 @@ public sealed class GestorCuarentena : IGestorCuarentena
         EstadoActual = r.Estado, Mensaje = mensaje, CodigoError = codigo
     };
 }
+

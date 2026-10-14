@@ -8,6 +8,9 @@ public sealed class DownloadMonitor : IDisposable
     private FileSystemWatcher? _watcher;
     private CancellationTokenSource? _cancelacion;
     private readonly ConcurrentDictionary<string, byte> _pendientes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, (string Hash, DateTimeOffset Hasta)> _restauraciones = new(StringComparer.OrdinalIgnoreCase);
+    public void RegistrarRestauracion(string ruta, string hash) =>
+        _restauraciones[Path.GetFullPath(ruta)] = (hash, DateTimeOffset.UtcNow.AddSeconds(30));
     private static readonly HashSet<string> Extensiones = new(StringComparer.OrdinalIgnoreCase)
         { ".exe", ".msi", ".bat", ".ps1", ".vbs", ".cmd", ".com", ".scr" };
     public event Action<string>? ArchivoDetectado;
@@ -75,6 +78,13 @@ public sealed class DownloadMonitor : IDisposable
                     if (estable >= 2)
                     {
                         token.ThrowIfCancellationRequested();
+                        if (_restauraciones.TryGetValue(ruta, out var restaurada))
+                        {
+                            if (restaurada.Hasta > DateTimeOffset.UtcNow &&
+                                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(lectura))
+                                    .Equals(restaurada.Hash, StringComparison.OrdinalIgnoreCase)) return;
+                            _restauraciones.TryRemove(ruta, out _);
+                        }
                         ArchivoDetectado?.Invoke(ruta);
                         return;
                     }
@@ -97,3 +107,4 @@ public sealed class DownloadMonitor : IDisposable
     }
     public void Dispose() => DetenerMonitoreo();
 }
+

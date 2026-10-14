@@ -6,6 +6,7 @@ namespace SecureGate.Proteccion;
 // Puente entre cuarentena y transporte. No realiza consultas de red por si mismo.
 public sealed class PreparadorEnviosProtegidos
 {
+    public event Action<string, string>? RestauracionPendiente;
     private readonly AlmacenCuarentena _almacen;
     private readonly GestorCuarentena _gestor;
     private readonly AnalizadorLocal _analizador;
@@ -100,6 +101,12 @@ public sealed class PreparadorEnviosProtegidos
     {
         string normalizado = Servidor(servidor);
         await using var sesion = await _almacen.AbrirSesionAsync(ct, ".preparacion-envios.lock");
+        foreach (var id in _almacen.Identificadores())
+        {
+            var previo = _almacen.Leer(id);
+            if (previo.OperacionPendiente == "Liberar")
+                RestauracionPendiente?.Invoke(previo.RutaOriginal, previo.Sha256);
+        }
         var registros = await _gestor.RecuperarPendientesAsync(ct);
         var recuperados = new List<EnvioCliente>();
         foreach (var r in registros)
@@ -119,3 +126,4 @@ public sealed class PreparadorEnviosProtegidos
         return recuperados;
     }
 }
+

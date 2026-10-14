@@ -5,6 +5,17 @@ namespace SecureGate.Proteccion;
 
 internal static class PermisosCuarentena
 {
+    internal static void RestaurarAcceso(string ruta, string sddl)
+    {
+        Ntfs(ruta);
+        var permisos = new FileSecurity();
+        permisos.SetSecurityDescriptorSddlForm(sddl, AccessControlSections.Access);
+        FileSystemAclExtensions.SetAccessControl(new FileInfo(ruta), permisos);
+        string esperado = permisos.GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+        string actual = FileSystemAclExtensions.GetAccessControl(new FileInfo(ruta))
+            .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+        if (actual != esperado) throw new UnauthorizedAccessException("No se restauraron los permisos originales.");
+    }
     private static SecurityIdentifier Usuario()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Los permisos requieren Windows.");
@@ -79,3 +90,4 @@ internal static class PermisosCuarentena
             throw new UnauthorizedAccessException("No se confirmo la restriccion de ejecucion.");
     }
 }
+
