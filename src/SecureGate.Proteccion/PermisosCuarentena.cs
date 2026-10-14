@@ -10,11 +10,43 @@ internal static class PermisosCuarentena
         Ntfs(ruta);
         var permisos = new FileSecurity();
         permisos.SetSecurityDescriptorSddlForm(sddl, AccessControlSections.Access);
-        FileSystemAclExtensions.SetAccessControl(new FileInfo(ruta), permisos);
-        string esperado = permisos.GetSecurityDescriptorSddlForm(AccessControlSections.Access);
-        string actual = FileSystemAclExtensions.GetAccessControl(new FileInfo(ruta))
-            .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
-        if (actual != esperado) throw new UnauthorizedAccessException("No se restauraron los permisos originales.");
+        // Restaurar explicitamente la politica de herencia. Windows puede normalizar
+        // los indicadores y el orden del SDDL sin cambiar los permisos.
+        permisos.SetAccessRuleProtection(permisos.AreAccessRulesProtected, preserveInheritance: true);
+        try
+        {
+            FileSystemAclExtensions.SetAccessControl(new FileInfo(ruta), permisos);
+            var actuales = FileSystemAclExtensions.GetAccessControl(new FileInfo(ruta));
+            if (!AccesoEquivalente(permisos, actuales))
+                throw new UnauthorizedAccessException("Los permisos aplicados no equivalen a los originales.");
+        }
+        catch
+        {
+            // Si no se confirma la restauracion, conservar la restriccion de ejecucion.
+            RestringirArchivo(ruta);
+            throw;
+        }
+    }
+    private static bool AccesoEquivalente(FileSecurity esperado, FileSecurity actual)
+    {
+        if (esperado.AreAccessRulesProtected != actual.AreAccessRulesProtected ||
+            !esperado.AreAccessRulesCanonical || !actual.AreAccessRulesCanonical) return false;
+        static Dictionary<string, int> Reglas(FileSecurity seguridad)
+        {
+            var reglas = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (FileSystemAccessRule r in seguridad.GetAccessRules(true, true, typeof(SecurityIdentifier)))
+            {
+                string clave = r.IdentityReference.Value + "|" + r.AccessControlType + "|" +
+                    r.InheritanceFlags + "|" + r.PropagationFlags + "|" + r.IsInherited;
+                reglas.TryGetValue(clave, out int derechos);
+                reglas[clave] = derechos | (int)r.FileSystemRights;
+            }
+            return reglas;
+        }
+        var originales = Reglas(esperado);
+        var aplicadas = Reglas(actual);
+        return originales.Count == aplicadas.Count &&
+            originales.All(r => aplicadas.TryGetValue(r.Key, out int derechos) && derechos == r.Value);
     }
     private static SecurityIdentifier Usuario()
     {

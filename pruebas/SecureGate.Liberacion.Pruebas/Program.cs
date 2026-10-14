@@ -48,7 +48,7 @@ Rechazo(avAmenaza, "rechaza deteccion local aunque la evaluacion diga Incompleto
 var vtAmenaza = Informe(); vtAmenaza.Reputacion = new ResultadoReputacion { Sha256 = archivo.Sha256, MotoresMaliciosos = 1 };
 Rechazo(vtAmenaza, "rechaza deteccion de VirusTotal aunque la evaluacion diga Incompleto.");
 
-if (args.Contains("--real"))
+if (args.Contains("--real") || args.Contains("--recuperar"))
 {
     if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Prueba real requiere Windows.");
     var opciones = new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -79,6 +79,22 @@ if (args.Contains("--real"))
     var registro = await gestor.ConsultarRegistroAsync(envio.Solicitud.AnalisisLocal.Archivo.ArchivoId);
     if (!registro.RutaOriginal.Equals(Path.Combine(monitor, "PruebaSecureGate_CMD.exe"), StringComparison.OrdinalIgnoreCase))
         throw new InvalidDataException("Ubicacion original no admitida para la prueba.");
+    if (args.Contains("--recuperar"))
+    {
+        Exigir(registro.Estado == EstadoArchivo.Liberado && registro.OperacionPendiente == "" &&
+            registro.MetodoAutorizacion == "CredUI+LogonUser" &&
+            registro.AnalisisLiberacionId == envio.AnalisisId,
+            "recupera la liberacion previamente autorizada sin solicitar otra contrasena.");
+        Exigir(File.Exists(registro.RutaOriginal) && !File.Exists(envio.RutaArchivo),
+            "copia benigna restaurada y muestra retirada de cuarentena.");
+        using var restaurada = File.OpenRead(registro.RutaOriginal);
+        Exigir(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(restaurada)).ToLowerInvariant() == registro.Sha256,
+            "la recuperacion conserva el SHA-256 original.");
+        Exigir(registro.EvaluacionAlLiberar == envio.Resultado!.Evaluacion,
+            "la recuperacion no cambia la evaluacion.");
+        Console.WriteLine("RECUPERACION COMPLETADA: " + registro.RutaOriginal);
+        return;
+    }
     var negada = await gestor.LiberarAsync(new SolicitudLiberacion
     { ArchivoId = registro.ArchivoId, Sha256Esperado = registro.Sha256, Motivo = MotivoLiberacion.ExcepcionDelUsuario });
     Exigir(!negada.Realizada && File.Exists(envio.RutaArchivo), "un motivo sin autorizacion no libera.");
