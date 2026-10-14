@@ -90,7 +90,7 @@ public sealed class PreparadorEnviosProtegidos
             Solicitud = new SolicitudAnalisis
             { SolicitudId = Guid.NewGuid(), AnalisisLocal = local },
             RutaArchivo = _almacen.Muestra(archivoId), Servidor = servidor,
-            EstadoLocal = "Retenido; preparado para envio"
+            EstadoLocal = "Retenido; preparado para envio", DecisionUsuarioPendiente = true
         };
         // Antes de cualquier POST. Un cierre posterior conserva la misma SolicitudId.
         await _envios.GuardarAsync(envio, ct);

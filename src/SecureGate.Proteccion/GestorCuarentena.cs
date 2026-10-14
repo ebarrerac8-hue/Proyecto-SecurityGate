@@ -121,7 +121,8 @@ public sealed class GestorCuarentena : IGestorCuarentena
         r.UsuarioLiberacionSid = autorizacion.UsuarioSid;
         r.FechaAutorizacionLiberacionUtc = autorizacion.FechaUtc;
         r.EvaluacionAlLiberar = autorizacion.Evaluacion;
-        r.MetodoAutorizacion = "CredUI+LogonUser";
+        r.MetodoAutorizacion = autorizacion.Metodo;
+        r.RiesgoAceptadoAlLiberar = autorizacion.RiesgoAceptado;
         r.OperacionPendiente = "Liberar";
         _almacen.Guardar(r); // Autorizar y registrar antes del movimiento recuperable.
         await _almacen.CompletarLiberacionAsync(r, ct);

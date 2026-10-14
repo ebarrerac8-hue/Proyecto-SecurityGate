@@ -20,7 +20,8 @@ var resultado = new ResultadoAnalisis
 };
 var reglas = PreparadorEvidenciasIa.Preparar(resultado).Single(e => e.Tipo == "Reglas").Descripcion;
 Exigir(reglas.Contains("liberación excepcional", StringComparison.OrdinalIgnoreCase) &&
-    reglas.Contains("autenticación de Windows") && reglas.Contains("no concede permisos") &&
+    reglas.Contains("aceptación explícita del riesgo") && reglas.Contains("No solicita contraseñas") &&
+    reglas.Contains("no lo ejecuta") && reglas.Contains("no concede permisos") &&
     reglas.Contains("no demuestra que esa autorización") && resultado.Evaluacion == EvaluacionRiesgo.Incompleto,
     "evidencias distinguen liberacion excepcional y evaluacion sin conceder autorizacion.");
 
