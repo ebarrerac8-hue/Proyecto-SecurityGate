@@ -13,7 +13,7 @@ internal static class InterpretadorDefender
         if (truncada)
             return Error("DEFENDER_SALIDA_EXTENSA", "La salida excedio el limite; no se puede interpretar completa.");
         var nombres = Regex.Matches(salida,
-            @"(?im)^\s*(?:Threat\s*Name|ThreatName|Threat)\s*[:=]\s*(\S[^\r\n]*)$")
+            @"(?im)^[ \t]*(?:Threat[ \t]*Name|ThreatName|Threat)[ \t]*[:=][ \t]*(\S[^\r\n]*)\r?$")
             .Select(m => m.Groups[1].Value.Trim())
             .Where(n => Regex.IsMatch(n, @"^[A-Za-z][A-Za-z0-9]*:[^\s]+/[^\s]+$"))
             .Distinct().ToList();
