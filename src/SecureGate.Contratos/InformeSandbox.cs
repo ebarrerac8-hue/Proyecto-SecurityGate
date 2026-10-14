@@ -42,6 +42,12 @@ public sealed class InformeSandbox
     public EstadoComprobacion Estado { get; set; }
         = EstadoComprobacion.NoRealizada;
 
+    // Cuando hay reutilización, los eventos y sus fechas pertenecen a esta observación histórica.
+    public Guid? AnalisisOrigenId { get; set; }
+    public Guid? ArchivoOrigenId { get; set; }
+    public string? NombreArchivoOrigen { get; set; }
+    public DateTimeOffset? FechaReutilizacionUtc { get; set; }
+
     public bool MuestraEjecutada { get; set; }
 
     public bool ObservadorIniciado { get; set; }

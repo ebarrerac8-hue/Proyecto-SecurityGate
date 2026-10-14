@@ -64,7 +64,11 @@ internal static class PresentacionAnalisis
     internal static string Alcance(EnvioCliente envio)
     {
         var faltantes = Faltantes(envio);
-        return (faltantes.Count == 0 ? "" : "Pendientes o fallidas: " + string.Join(", ", faltantes) + ".\n") +
+        var s = envio.Resultado?.Sandbox;
+        string historial = s?.AnalisisOrigenId is not null
+            ? $"Observación Sandbox reutilizada del {s.FinUtc?.ToLocalTime():g}; no se ejecutó de nuevo para esta solicitud.\n"
+            : "";
+        return historial + (faltantes.Count == 0 ? "" : "Pendientes o fallidas: " + string.Join(", ", faltantes) + ".\n") +
             "La ausencia de amenazas reportadas no garantiza seguridad. " +
             "Sandbox observa el archivo durante un tiempo limitado y sin red; el detalle conserva sus limitaciones.";
     }

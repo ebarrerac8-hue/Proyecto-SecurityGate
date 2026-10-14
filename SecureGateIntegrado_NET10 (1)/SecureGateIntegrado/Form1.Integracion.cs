@@ -710,6 +710,12 @@ public partial class Form1
         if (resultado.Sandbox is not null)
         {
             texto.AppendLine("\nSANDBOX");
+            if (resultado.Sandbox.AnalisisOrigenId is { } origen)
+            {
+                texto.AppendLine($"Observación histórica reutilizada. Análisis de origen: {origen}");
+                texto.AppendLine($"Archivo de origen: {resultado.Sandbox.NombreArchivoOrigen}; ID: {resultado.Sandbox.ArchivoOrigenId}");
+                texto.AppendLine($"Reutilización: {resultado.Sandbox.FechaReutilizacionUtc:o}. No se ejecutó de nuevo en esta solicitud.");
+            }
             texto.AppendLine($"Estado: {resultado.Sandbox.Estado}");
             texto.AppendLine($"Muestra ejecutada: {resultado.Sandbox.MuestraEjecutada}");
             texto.AppendLine($"Observador iniciado: {resultado.Sandbox.ObservadorIniciado}");

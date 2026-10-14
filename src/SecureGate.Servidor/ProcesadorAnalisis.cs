@@ -62,7 +62,9 @@ public sealed class ProcesadorAnalisis : BackgroundService
                         // No repetir una consulta ya guardada si se interrumpió Sandbox.
                         if (resultado.Reputacion?.Estado != EstadoComprobacion.Completada ||
                             !string.Equals(resultado.Reputacion.Sha256, resultado.Archivo.Sha256,
-                                StringComparison.OrdinalIgnoreCase))
+                                StringComparison.OrdinalIgnoreCase) ||
+                            resultado.Reputacion.FechaConsultaUtc is not { } ultimaConsulta ||
+                            DateTimeOffset.UtcNow - ultimaConsulta > TimeSpan.FromMinutes(5))
                         {
                             resultado.Reputacion = await _reputacion.ConsultarAsync(
                                 resultado.Archivo.Sha256, stoppingToken);
@@ -82,20 +84,40 @@ public sealed class ProcesadorAnalisis : BackgroundService
                         }
                         else
                         {
-                            resultado.Resumen = "Preparando prueba aislada en Windows Sandbox.";
-                            await _repositorio.GuardarAsync(trabajo, stoppingToken);
-                            _logger.LogInformation("SANDBOX INICIO: {AnalisisId}", id);
+                            await PoliticaReutilizacionSandbox.ValidarMuestraAsync(trabajo, stoppingToken);
+                            var origen = PoliticaReutilizacionSandbox.Seleccionar(
+                                await _repositorio.ListarTodosAsync(stoppingToken), trabajo, _opciones, DateTimeOffset.UtcNow);
+                            if (origen is not null)
+                            {
+                                resultado.Sandbox = PoliticaReutilizacionSandbox.Copiar(origen, trabajo, DateTimeOffset.UtcNow);
+                                trabajo.VersionObservacionSandbox = origen.VersionObservacionSandbox;
+                                trabajo.SegundosObservacionSandbox = origen.SegundosObservacionSandbox;
+                                AgregarLimitacion(resultado,
+                                    "Se reutilizó una observación histórica de Sandbox del mismo SHA-256; no se ejecutó esta solicitud de nuevo.");
+                                _logger.LogInformation("SANDBOX REUTILIZADO: {AnalisisId}; origen: {Origen}; observación: {Fecha}",
+                                    id, resultado.Sandbox.AnalisisOrigenId, resultado.Sandbox.FinUtc);
+                            }
+                            else
+                            {
+                                resultado.Resumen = "Preparando prueba aislada en Windows Sandbox.";
+                                await _repositorio.GuardarAsync(trabajo, stoppingToken);
+                                _logger.LogInformation("SANDBOX INICIO: {AnalisisId}", id);
 
-                            resultado.Sandbox = await _sandbox.EjecutarAsync(
-                                new SolicitudPruebaSandbox
-                                {
-                                    AnalisisId = id,
-                                    ArchivoId = resultado.Archivo.ArchivoId,
-                                    Sha256 = resultado.Archivo.Sha256,
-                                    RutaMuestraServidor = trabajo.RutaMuestraServidor,
-                                    ExtensionMuestra = resultado.Archivo.Extension,
-                                    TiempoObservacionSegundos = _opciones.TiempoObservacionSegundos
-                                }, stoppingToken);
+                                resultado.Sandbox = await _sandbox.EjecutarAsync(
+                                    new SolicitudPruebaSandbox
+                                    {
+                                        AnalisisId = id,
+                                        ArchivoId = resultado.Archivo.ArchivoId,
+                                        Sha256 = resultado.Archivo.Sha256,
+                                        RutaMuestraServidor = trabajo.RutaMuestraServidor,
+                                        ExtensionMuestra = resultado.Archivo.Extension,
+                                        TiempoObservacionSegundos = _opciones.TiempoObservacionSegundos
+                                    }, stoppingToken);
+
+                                trabajo.VersionObservacionSandbox = PoliticaReutilizacionSandbox.VersionActual;
+                                trabajo.SegundosObservacionSandbox = _opciones.TiempoObservacionSegundos;
+
+                            }
 
                             foreach (string detalle in resultado.Sandbox.Limitaciones)
                                 AgregarLimitacion(resultado, detalle);

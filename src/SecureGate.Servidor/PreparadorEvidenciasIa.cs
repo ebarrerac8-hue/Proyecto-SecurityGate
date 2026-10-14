@@ -30,6 +30,10 @@ public static class PreparadorEvidenciasIa
             $"Estado: {sandbox.Estado}; muestra ejecutada: {sandbox.MuestraEjecutada}; " +
             $"observador iniciado: {sandbox.ObservadorIniciado}; red: {sandbox.RedHabilitada}; " +
             $"inicio: {sandbox.InicioUtc:o}; fin: {sandbox.FinUtc:o}; eventos: {sandbox.Eventos.Count}.");
+        if (sandbox?.AnalisisOrigenId is { } origen)
+            Agregar("ReutilizacionSandbox", $"Observación histórica reutilizada; análisis de origen: {origen}; " +
+                $"archivo de origen: {NombreMinimo(sandbox.NombreArchivoOrigen)}; reutilización: {sandbox.FechaReutilizacionUtc:o}. " +
+                "No se ejecutó de nuevo el archivo para esta solicitud. Sus fechas y eventos corresponden a la observación original.");
         Agregar("Limitacion",
             "La observación es parcial. No comprueba todo el registro, toda la red ni todos los procesos breves. " +
             "Los eventos de archivo no identifican su autor. Las evidencias del invitado no son resistentes a manipulación.");
@@ -62,4 +66,3 @@ public static class PreparadorEvidenciasIa
         return string.IsNullOrWhiteSpace(nombre) ? "(omitido)" : nombre;
     }
 }
-
