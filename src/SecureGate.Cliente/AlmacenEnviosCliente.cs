@@ -13,6 +13,9 @@ public sealed class EnvioCliente
     public ResultadoAnalisis? Resultado { get; set; }
     public string EstadoLocal { get; set; } = "Preparado";
     public string? UltimoError { get; set; }
+    public bool DecisionUsuarioPendiente { get; set; }
+    public string? DecisionUsuario { get; set; }
+    public DateTimeOffset? FechaDecisionUsuarioUtc { get; set; }
     public DateTimeOffset FechaCreacionUtc { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset FechaActualizacionUtc { get; set; } = DateTimeOffset.UtcNow;
     public bool Terminado => Resultado?.Estado is EstadoAnalisis.Completado or

@@ -58,7 +58,7 @@ public sealed class ClienteGemini
                 expresa límites de las evidencias; no significa por sí sola amenaza detectada ni prohibición
                 absoluta de cualquier acción. No afirmes que el servidor prohíbe toda liberación por ese estado.
                 La liberación excepcional pertenece al flujo independiente del cliente, con comprobaciones,
-                aceptación de riesgo y autenticación de Windows. Tú no la autorizas ni conoces su estado actual.
+                aceptación explícita de riesgo, sin pedir contraseñas. Tú no la autorizas ni conoces su estado actual.
                 Redacta un resumen breve y hasta seis observaciones. Cada observación y el resumen
                 deben citar uno o más identificadores E0001, etc., que existan en las evidencias.
                 Diferencia hechos observados de posibles interpretaciones. No atribuyas al archivo

@@ -13,12 +13,46 @@ public sealed class AutorizacionLiberacion
     internal EvaluacionRiesgo Evaluacion { get; }
     internal string UsuarioSid { get; }
     internal DateTimeOffset FechaUtc { get; }
+    internal string Metodo { get; }
+    internal bool RiesgoAceptado { get; }
     private int _consumida;
-    private AutorizacionLiberacion(ResultadoAnalisis r, string sid)
+    private AutorizacionLiberacion(ResultadoAnalisis r, string sid,
+        string metodo = "CredUI+LogonUser", bool riesgoAceptado = false)
     {
         ArchivoId = r.Archivo.ArchivoId; AnalisisId = r.AnalisisId;
         Sha256 = r.Archivo.Sha256; Evaluacion = r.Evaluacion;
         UsuarioSid = sid; FechaUtc = DateTimeOffset.UtcNow;
+        Metodo = metodo; RiesgoAceptado = riesgoAceptado;
+    }
+
+    // La decisión explícita sustituye las credenciales en el cliente. No es autenticación adicional.
+    public static async Task<AutorizacionLiberacion?> SolicitarConfirmacionAsync(
+        ClienteAnalisisHttp cliente, Guid archivoId, Guid analisisId, string sha256,
+        bool excepcion, Func<ResultadoAnalisis, bool> confirmar, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(cliente);
+        ArgumentNullException.ThrowIfNull(confirmar);
+        var resultado = await ConsultarConLimiteAsync(cliente, analisisId, ct);
+        ValidarDecision(resultado, archivoId, analisisId, sha256, excepcion);
+        var tipo = PoliticaDecisionAnalisis.Clasificar(resultado);
+        ct.ThrowIfCancellationRequested();
+        if (!confirmar(resultado)) return null;
+        // Volver a consultar tras la decisión. Un resultado cambiado requiere otro diálogo.
+        resultado = await ConsultarConLimiteAsync(cliente, analisisId, ct);
+        ValidarDecision(resultado, archivoId, analisisId, sha256, excepcion);
+        if (PoliticaDecisionAnalisis.Clasificar(resultado) != tipo)
+            throw new InvalidOperationException("El resultado cambió. Revisá el informe antes de decidir nuevamente.");
+        ct.ThrowIfCancellationRequested();
+        using var identidad = WindowsIdentity.GetCurrent();
+        string sid = identidad.User?.Value ?? throw new UnauthorizedAccessException("No se obtuvo la cuenta actual.");
+        return new(resultado, sid, excepcion ? "ConfirmacionExcepcional" : "ConfirmacionExplicita", excepcion);
+    }
+
+    internal static void ValidarDecision(ResultadoAnalisis r, Guid archivo, Guid analisis, string hash, bool excepcion)
+    {
+        PoliticaDecisionAnalisis.ValidarIdentidad(r, archivo, analisis, hash);
+        if (!excepcion && PoliticaDecisionAnalisis.Clasificar(r) != TipoResultadoDecision.SinAmenazasReportadas)
+            throw new UnauthorizedAccessException("El resultado requiere aceptación explícita de riesgo. La muestra sigue retenida.");
     }
 
     public static async Task<AutorizacionLiberacion?> SolicitarWindowsAsync(

@@ -33,7 +33,7 @@ public partial class Form1
     private readonly Button _pausar = new() { Text = "Detener consulta", AutoSize = true, Enabled = false };
     private readonly Button _reintentar = new() { Text = "🔁 Recuperar resultado", AutoSize = true, Enabled = false };
     private readonly Button _eliminar = new() { Text = "🗑️  Eliminar", AutoSize = true, Enabled = false };
-    private readonly Button _liberar = new() { Text = "Liberar bajo mi responsabilidad", AutoSize = true, Enabled = false };
+    private readonly Button _liberar = new() { Text = "Decidir sobre archivo…", AutoSize = true, Enabled = false };
     private readonly Button _exportar = new() { Text = "Exportar informe…", AutoSize = true, Enabled = false };
     private static readonly JsonSerializerOptions JsonInforme = CrearJsonInforme();
 
@@ -135,6 +135,7 @@ public partial class Form1
             Icon = SystemIcons.Shield, Text = "SecureGate", Visible = true, ContextMenuStrip = menu
         };
         _bandeja.DoubleClick += (_, _) => RestaurarVentana();
+        _bandeja.BalloonTipClicked += (_, _) => RestaurarVentana();
         _monitor.ArchivoDetectado += ruta => EnInterfaz(() => { _ = AnalizarAsync(ruta, true); });
         _monitor.ErrorMonitoreo += mensaje => EnInterfaz(() => Notificar(mensaje));
         Shown += async (_, _) => await IniciarClienteAsync();
@@ -230,6 +231,7 @@ public partial class Form1
             IniciarMonitor(_carpetaMonitoreo);
             if (_retencionAutomatica) await RecuperarProteccionAsync();
             else await ReanudarPendientesAsync();
+            foreach (var envio in await _envios.ListarAsync(_salida.Token)) EncolarDecision(envio);
         }
         catch (OperationCanceledException) when (_salida.IsCancellationRequested) { }
         catch (Exception error)
@@ -344,7 +346,7 @@ public partial class Form1
             await AtenderEnvioAsync(envio, _operacion!.Token);
             if (automatico && !_cerrado)
                 Notificar(envio.Solicitud.AnalisisLocal.Archivo.NombreOriginal + ": " +
-                    (envio.Resultado is null ? envio.EstadoLocal : RiesgoAmigable(envio.Resultado.Evaluacion)) +
+                    (envio.Resultado is null ? envio.EstadoLocal : PresentacionAnalisis.Resultado(envio)) +
                     (_retencionAutomatica ? ". El archivo sigue retenido. Abrí SecureGate para ver el informe." : ". Abrí SecureGate para ver el informe."));
         }
         catch (OperationCanceledException)
@@ -354,7 +356,12 @@ public partial class Form1
         catch (Exception error)
         {
             await RegistrarErrorAsync(envio, error);
-            if (!_cerrado && automatico) Notificar("No se pudo completar el análisis. Revisá SecureGate; no se liberó el archivo.");
+            if (!_cerrado && automatico)
+            {
+                Notificar("No se pudo completar el análisis. No se liberó el archivo.");
+                if (envio is null) MessageBox.Show("No se pudo preparar el análisis: " + error.Message +
+                    "\nNo se devolvió ningún archivo. Revisá SecureGate.", "SecureGate", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
             if (!_cerrado && !automatico)
                 MessageBox.Show(this, error.Message, "Análisis",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -365,6 +372,9 @@ public partial class Form1
             {
                 TerminarEspera();
                 _cola.Release();
+                if (envio is not null) EncolarDecision(envio);
+                ProcesarDecisiones();
+                if (!_cerrado && _actual is not null) MostrarRegistro(_actual);
             }
         }
     }
@@ -427,6 +437,9 @@ public partial class Form1
             {
                 TerminarEspera();
                 _cola.Release();
+                EncolarDecision(envio);
+                ProcesarDecisiones();
+                if (!_cerrado && _actual is not null) MostrarRegistro(_actual);
             }
         }
     }
@@ -593,12 +606,16 @@ public partial class Form1
         _eliminar.Enabled = EsMuestraRetenida(envio) && _cola.CurrentCount > 0;
         _exportar.Enabled = true;
         _liberar.Enabled = EsMuestraRetenida(envio) && completado && _cola.CurrentCount > 0 &&
-            envio.Resultado?.Evaluacion != EvaluacionRiesgo.AmenazaDetectada;
+            !_decisionVisible;
     }
 
     private void MostrarInforme()
     {
-        if (_actual is null) return;
+        if (_actual is not null) MostrarInforme(_actual);
+    }
+
+    private void MostrarInforme(EnvioCliente envio)
+    {
         using var fuente = new Font("Consolas", 10);
         using var ventana = new Form
         {
@@ -609,10 +626,12 @@ public partial class Form1
         {
             Multiline = true, ReadOnly = true, Dock = DockStyle.Fill,
             ScrollBars = ScrollBars.Both, WordWrap = false,
-            Font = fuente, Text = CrearInforme(_actual)
+            Font = fuente, Text = CrearInforme(envio)
         };
         ventana.Controls.Add(texto);
-        ventana.ShowDialog(this);
+        ventana.TopMost = _decisionVisible;
+        ventana.StartPosition = FormStartPosition.CenterScreen;
+        ventana.ShowDialog();
     }
 
     private void ExportarInforme()
@@ -650,6 +669,8 @@ public partial class Form1
         texto.AppendLine("SolicitudId: " + envio.Solicitud.SolicitudId);
         texto.AppendLine("AnalisisId: " + envio.AnalisisId);
         texto.AppendLine("Estado local: " + envio.EstadoLocal);
+        texto.AppendLine("Decisión del usuario: " + (envio.DecisionUsuario ?? "Pendiente o anterior a esta versión"));
+        texto.AppendLine("Fecha de decisión: " + envio.FechaDecisionUsuarioUtc?.ToString("O"));
         var firmaLocal = envio.Solicitud.AnalisisLocal.FirmaDigital;
         texto.AppendLine("Firma local: " + firmaLocal.Estado + "; " + firmaLocal.Firma);
         texto.AppendLine("Firmante: " + firmaLocal.Firmante);
@@ -766,7 +787,7 @@ public partial class Form1
         tabla.Controls.Add(buscar, 1, tabla.RowCount - 1);
         Fila(retener);
         Fila(new Label { AutoSize = true, MaximumSize = new Size(570, 0),
-            Text = "Esta versión monitorea ejecutables .exe. La retención mueve el archivo a cuarentena. Todavía no constituye un bloqueo global de ejecución. La liberación excepcional exige confirmación y autorización de Windows; no cambia la evaluación." });
+            Text = "Esta versión monitorea ejecutables .exe. La retención mueve el archivo a cuarentena. Todavía no constituye un bloqueo global de ejecución. La devolución exige una decisión explícita. Si hay riesgo, requiere una segunda confirmación; no cambia la evaluación." });
         Fila(new Label { AutoSize = true, MaximumSize = new Size(570, 0), Margin = new Padding(3, 12, 3, 12),
             Text = "Los envíos existentes conservan su servidor. Cambiar esta opción no libera archivos retenidos." });
         var botones = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill,
@@ -900,6 +921,10 @@ public partial class Form1
         if (r.Estado == EstadoArchivo.Liberado) envio.EstadoLocal = "Archivo liberado bajo responsabilidad; informe conservado";
         else if (r.Estado == EstadoArchivo.Eliminado) envio.EstadoLocal = "Archivo eliminado; informe conservado";
         else return;
+        envio.DecisionUsuarioPendiente = false;
+        envio.DecisionUsuario ??= r.Estado == EstadoArchivo.Eliminado ? "Eliminar" :
+            r.MetodoAutorizacion == "ConfirmacionExcepcional" ? "LiberarConRiesgo" : "Devolver";
+        envio.FechaDecisionUsuarioUtc ??= r.FechaAutorizacionLiberacionUtc ?? r.FechaActualizacionUtc;
         await _envios.GuardarAsync(envio, ct);
     }
 
@@ -915,73 +940,13 @@ public partial class Form1
 
     private async Task EliminarArchivoAsync()
     {
-        var envio = _actual;
-        if (envio is null || !EsMuestraRetenida(envio) || !await _cola.WaitAsync(0)) return;
-        try
-        {
-            MostrarRegistro(envio);
-            if (MessageBox.Show(this, "¿Eliminar definitivamente la muestra retenida? El informe se conservará.",
-                "Eliminar archivo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            var gestor = new GestorCuarentena(EntornoCliente.CarpetaCuarentena);
-            var operacion = await gestor.EliminarAsync(envio.Solicitud.AnalisisLocal.Archivo.ArchivoId, _salida.Token);
-            if (!operacion.Realizada) throw new InvalidOperationException(operacion.Mensaje);
-            envio.EstadoLocal = "Archivo eliminado; informe conservado";
-            envio.UltimoError = null;
-            await _envios.GuardarAsync(envio, _salida.Token);
-            await _historialPersistencia.ActualizarRegistroAsync(envio);
-            MessageBox.Show(this, operacion.Mensaje, "SecureGate");
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception error) { if (!_cerrado) MessageBox.Show(this, error.Message, "No se pudo eliminar"); }
-        finally
-        {
-            _cola.Release();
-            if (!_cerrado && _actual is not null) { ActualizarFila(_actual); MostrarRegistro(_actual); }
-        }
+        if (_actual is { } envio) await AplicarDecisionAsync(envio, AccionDecisionArchivo.Eliminar);
     }
 
     private async Task LiberarArchivoAsync()
     {
-        var envio = _actual;
-        if (envio?.AnalisisId is not { } id || !EsMuestraRetenida(envio) || !await _cola.WaitAsync(0)) return;
-        try
-        {
-            MostrarRegistro(envio);
-            if (MessageBox.Show(this,
-                "Liberar permite abrir el archivo en tu computadora. El análisis no garantiza seguridad. " +
-                "La evaluación permanecerá igual. ¿Aceptas el riesgo y deseas autorizar esta acción con Windows?",
-                "Liberar bajo mi responsabilidad", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            string direccion = NormalizarServidor(envio.Servidor);
-            if (!_clientes.TryGetValue(direccion, out var cliente))
-            {
-                cliente = new ClienteAnalisisHttp(new Uri(direccion));
-                _clientes.Add(direccion, cliente);
-            }
-            var archivo = envio.Solicitud.AnalisisLocal.Archivo;
-            var permiso = await AutorizacionLiberacion.SolicitarWindowsAsync(cliente,
-                archivo.ArchivoId, id, archivo.Sha256, true, Handle, _salida.Token);
-            if (permiso is null) { MessageBox.Show(this, "Autorización cancelada. El archivo sigue retenido."); return; }
-            var gestor = new GestorCuarentena(EntornoCliente.CarpetaCuarentena);
-            var registro = await gestor.ConsultarRegistroAsync(archivo.ArchivoId, _salida.Token);
-            // Evitar que el monitor vuelva a retener el mismo contenido al restaurarlo.
-            _monitor.RegistrarRestauracion(registro.RutaOriginal, registro.Sha256);
-            var operacion = await gestor.LiberarAutorizadoAsync(permiso, _salida.Token);
-            if (!operacion.Realizada) throw new InvalidOperationException(operacion.Mensaje);
-            envio.EstadoLocal = "Archivo liberado bajo responsabilidad; informe conservado";
-            envio.UltimoError = null;
-            await _envios.GuardarAsync(envio, _salida.Token);
-            await _historialPersistencia.ActualizarRegistroAsync(envio);
-            MessageBox.Show(this, operacion.Mensaje, "SecureGate");
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception error) { if (!_cerrado) MessageBox.Show(this, error.Message, "No se pudo liberar"); }
-        finally
-        {
-            _cola.Release();
-            if (!_cerrado && _actual is not null) { ActualizarFila(_actual); MostrarRegistro(_actual); }
-        }
+        if (_actual is { } envio && !_decisionVisible)
+            await MostrarDecisionAsync(envio);
     }
 
     private sealed class AjustesCliente

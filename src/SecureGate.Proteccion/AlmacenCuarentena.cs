@@ -22,6 +22,7 @@ public sealed class RegistroCuarentena
     public DateTimeOffset? FechaAutorizacionLiberacionUtc { get; set; }
     public EvaluacionRiesgo? EvaluacionAlLiberar { get; set; }
     public string? MetodoAutorizacion { get; set; }
+    public bool RiesgoAceptadoAlLiberar { get; set; }
     public EstadoArchivo Estado { get; set; }
     public string OperacionPendiente { get; set; } = "Retener";
 
@@ -198,9 +199,13 @@ internal sealed class AlmacenCuarentena
         using var identidad = System.Security.Principal.WindowsIdentity.GetCurrent();
         if (r.AnalisisLiberacionId is null || r.AnalisisLiberacionId == Guid.Empty ||
             r.UsuarioLiberacionSid != identidad.User?.Value ||
-            r.FechaAutorizacionLiberacionUtc is null || r.MetodoAutorizacion != "CredUI+LogonUser" ||
+            r.FechaAutorizacionLiberacionUtc is null ||
+            (r.MetodoAutorizacion != "CredUI+LogonUser" && r.MetodoAutorizacion != "ConfirmacionExplicita" &&
+             !(r.MetodoAutorizacion == "ConfirmacionExcepcional" && r.RiesgoAceptadoAlLiberar)) ||
             r.EvaluacionAlLiberar is null || !Enum.IsDefined(r.EvaluacionAlLiberar.Value) ||
-            r.EvaluacionAlLiberar == EvaluacionRiesgo.AmenazaDetectada || string.IsNullOrWhiteSpace(r.SddlOriginal))
+            (r.EvaluacionAlLiberar == EvaluacionRiesgo.AmenazaDetectada &&
+             !(r.MetodoAutorizacion == "ConfirmacionExcepcional" && r.RiesgoAceptadoAlLiberar)) ||
+            string.IsNullOrWhiteSpace(r.SddlOriginal))
             throw new UnauthorizedAccessException("Falta el registro de autorizacion de liberacion.");
         PermisosCuarentena.ValidarOrigen(r.RutaOriginal, Carpeta);
         string muestra = Muestra(r.ArchivoId);
