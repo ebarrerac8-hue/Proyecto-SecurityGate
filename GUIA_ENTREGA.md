@@ -1,3 +1,5 @@
+> **Documento histórico anterior al cierre del 14 de octubre de 2026.** Los pendientes, porcentajes, contratos propuestos y pasos de entrega que aparecen debajo describen una versión anterior; no representan el estado actual. Consulte [README.md](README.md) para el alcance y uso vigente y [INTEGRACION_PROTECCION.md](INTEGRACION_PROTECCION.md) para las comprobaciones realizadas. La versión actual integra Defender, cuarentena y liberación autorizada, admite `.exe` y usa inicio manual; la demostración pública tiene una dirección fija configurada.
+
 # SecureGate: guía del servidor y cliente
 
 ## 1. Alcance de esta entrega
