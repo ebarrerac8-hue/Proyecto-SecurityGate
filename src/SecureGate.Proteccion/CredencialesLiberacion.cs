@@ -48,7 +48,21 @@ internal static class CredencialesLiberacion
             else if (string.IsNullOrEmpty(grupo)) grupo = ".";
             // La contrasena se mantiene en memoria no administrada, nunca en strings ni registros.
             if (!LogonUserW(nombre, grupo, clave, 2, 0, out var token))
-                throw new UnauthorizedAccessException("Windows no valido las credenciales. No se libero el archivo.");
+            {
+                int errorWindows = Marshal.GetLastWin32Error();
+                token?.Dispose();
+                string motivo = errorWindows switch
+                {
+                    1326 => "Windows rechazo el usuario o la contrasena; el PIN no sirve para este metodo.",
+                    1385 => "La cuenta no tiene permitido el tipo de inicio de sesion requerido.",
+                    1331 => "La cuenta esta deshabilitada.",
+                    1909 => "La cuenta esta bloqueada. No repitas intentos de contrasena.",
+                    1327 => "Windows aplica una restriccion a esta cuenta.",
+                    _ => new Win32Exception(errorWindows).Message
+                };
+                throw new UnauthorizedAccessException(
+                    $"Windows no autorizo la liberacion. Codigo Win32: {errorWindows}. {motivo} No se libero el archivo.");
+            }
             using (token)
             using (var verificada = new WindowsIdentity(token.DangerousGetHandle()))
             using (var actual = WindowsIdentity.GetCurrent())
