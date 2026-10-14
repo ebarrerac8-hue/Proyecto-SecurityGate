@@ -29,10 +29,12 @@ public sealed class GestorCuarentena : IGestorCuarentena
             }
             throw new FileNotFoundException("No se encontro el archivo original.", origen);
         }
+        PermisosCuarentena.ValidarOrigen(origen, _almacen.Carpeta);
         var info = new FileInfo(origen);
         var r = new RegistroCuarentena
         {
             ArchivoId = Guid.NewGuid(), RutaOriginal = origen,
+            SddlOriginal = PermisosCuarentena.CapturarOriginal(origen),
             NombreOriginal = info.Name, Extension = info.Extension,
             TamanoBytes = info.Length,
             Sha256 = await AlmacenCuarentena.HashAsync(origen, cancellationToken),
@@ -42,13 +44,17 @@ public sealed class GestorCuarentena : IGestorCuarentena
         if (r.TamanoBytes <= 0) throw new InvalidDataException("Archivo vacio.");
         _almacen.Guardar(r); // Registrar antes de mover; permite recuperar un cierre intermedio.
         cancellationToken.ThrowIfCancellationRequested();
+        // Denegar ejecucion directa antes de mover; la deteccion previa sigue teniendo un intervalo.
+        PermisosCuarentena.RestringirArchivo(origen);
         File.Move(origen, _almacen.Muestra(r.ArchivoId), overwrite: false);
         await _almacen.ValidarAsync(r, cancellationToken);
+        PermisosCuarentena.RestringirArchivo(_almacen.Muestra(r.ArchivoId));
+        r.PermisosAplicados = true;
         r.Estado = EstadoArchivo.Retenido;
         r.OperacionPendiente = "";
         r.FechaActualizacionUtc = DateTimeOffset.UtcNow;
         _almacen.Guardar(r);
-        return Resultado(r, true, "Archivo retenido y registrado. No implica bloqueo global de ejecucion.");
+        return Resultado(r, true, "Archivo retenido con restriccion de ejecucion directa NTFS. No implica bloqueo global.");
     }
     public async Task<IReadOnlyList<RegistroCuarentena>> RecuperarPendientesAsync(
         CancellationToken cancellationToken = default)

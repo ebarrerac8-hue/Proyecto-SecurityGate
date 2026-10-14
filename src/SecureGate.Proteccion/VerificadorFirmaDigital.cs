@@ -47,6 +47,7 @@ internal static class VerificadorFirmaDigital
                 FileAccess.Write, FileShare.None, 65536, useAsync: true))
                 await entrada.CopyToAsync(salida, limite.Token);
 
+            PermisosCuarentena.RestringirArchivo(consulta);
             var inicio = new ProcessStartInfo(powershell)
             {
                 UseShellExecute = false, CreateNoWindow = true,

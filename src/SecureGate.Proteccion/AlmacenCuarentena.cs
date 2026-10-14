@@ -15,6 +15,8 @@ public sealed class RegistroCuarentena
     public string Sha256 { get; set; } = "";
     public DateTimeOffset FechaRegistroUtc { get; set; }
     public DateTimeOffset FechaActualizacionUtc { get; set; }
+    public string? SddlOriginal { get; set; }
+    public bool PermisosAplicados { get; set; }
     public EstadoArchivo Estado { get; set; }
     public string OperacionPendiente { get; set; } = "Retener";
 
@@ -36,6 +38,7 @@ internal sealed class AlmacenCuarentena
             "SecureGate", "Cuarentena"));
         Directory.CreateDirectory(Carpeta);
         ComprobarRuta(Carpeta);
+        PermisosCuarentena.ProtegerDirectorio(Carpeta);
     }
     internal static void ComprobarRuta(string ruta)
     {
@@ -140,6 +143,13 @@ internal sealed class AlmacenCuarentena
                 new FileInfo(r.RutaOriginal).Length != r.TamanoBytes)
                 throw new InvalidDataException("La retencion pendiente no coincide con el archivo original.");
             ct.ThrowIfCancellationRequested();
+            PermisosCuarentena.ValidarOrigen(r.RutaOriginal, Carpeta);
+            if (r.SddlOriginal is null)
+            {
+                r.SddlOriginal = PermisosCuarentena.CapturarOriginal(r.RutaOriginal);
+                Guardar(r);
+            }
+            PermisosCuarentena.RestringirArchivo(r.RutaOriginal);
             File.Move(r.RutaOriginal, muestra, overwrite: false);
         }
         if (r.OperacionPendiente == "Eliminar" && !File.Exists(muestra))
@@ -152,12 +162,24 @@ internal sealed class AlmacenCuarentena
         else if (r.OperacionPendiente == "Retener" && File.Exists(muestra))
         {
             await ValidarAsync(r, ct);
+            PermisosCuarentena.RestringirArchivo(muestra);
+            r.PermisosAplicados = true;
             r.Estado = EstadoArchivo.Retenido;
             r.OperacionPendiente = "";
             r.FechaActualizacionUtc = DateTimeOffset.UtcNow;
             Guardar(r);
         }
-        if (r.Estado == EstadoArchivo.Retenido) await ValidarAsync(r, ct);
+        if (r.Estado == EstadoArchivo.Retenido)
+        {
+            await ValidarAsync(r, ct);
+            PermisosCuarentena.RestringirArchivo(muestra);
+            if (!r.PermisosAplicados)
+            {
+                r.PermisosAplicados = true;
+                r.FechaActualizacionUtc = DateTimeOffset.UtcNow;
+                Guardar(r);
+            }
+        }
         return r;
     }
 }
