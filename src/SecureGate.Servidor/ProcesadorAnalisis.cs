@@ -134,8 +134,9 @@ public sealed class ProcesadorAnalisis : BackgroundService
                                 ?? resultado.Reputacion.CodigoError;
 
                             _logger.LogInformation(
-                                "SANDBOX FIN: {AnalisisId}; estado: {Estado}; eventos: {Cantidad}; error: {Error}",
-                                id, resultado.Sandbox.Estado, resultado.Sandbox.Eventos.Count,
+                                "SANDBOX RESULTADO: {AnalisisId}; reutilizado: {Reutilizado}; estado: {Estado}; eventos: {Cantidad}; error: {Error}",
+                                id, resultado.Sandbox.AnalisisOrigenId.HasValue,
+                                resultado.Sandbox.Estado, resultado.Sandbox.Eventos.Count,
                                 resultado.Sandbox.CodigoError ?? "ninguno");
                         }
 

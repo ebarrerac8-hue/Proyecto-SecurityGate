@@ -36,10 +36,6 @@ public partial class Form1
     private readonly Button _liberar = new() { Text = "Liberar bajo mi responsabilidad", AutoSize = true, Enabled = false };
     private readonly Button _exportar = new() { Text = "Exportar informe…", AutoSize = true, Enabled = false };
     private static readonly JsonSerializerOptions JsonInforme = CrearJsonInforme();
-    private static readonly HashSet<string> ExtensionesServidor = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".exe", ".msi", ".bat", ".cmd", ".ps1", ".com", ".scr", ".vbs"
-    };
 
     private void PrepararIntegracion()
     {
@@ -115,7 +111,7 @@ public partial class Form1
         lblSandboxTitle.Text = "Seleccioná un archivo";
         lblSandboxStatus.Text =
             "El servidor consultará su reputación y realizará la prueba aislada disponible.";
-        openFileDialog1.Filter = "Archivos admitidos|*.exe;*.msi;*.bat;*.cmd;*.ps1;*.com;*.scr;*.vbs";
+        openFileDialog1.Filter = "Ejecutables de Windows (*.exe)|*.exe";
         btnAnalyze.Click += selectFileButton_Click;
         btnHome.Click += (_, _) => { RestaurarVentana(); selectFileButton.Focus(); };
         btnHistory.Click += (_, _) => { RestaurarVentana(); ShowHistory(); };
@@ -252,6 +248,8 @@ public partial class Form1
         {
             if (!_historialDisponible)
                 throw new InvalidOperationException("El historial todavía no está disponible.");
+            if (!AlcanceAnalisis.AdmiteExtension(Path.GetExtension(ruta)))
+                throw new InvalidDataException("Esta versión analiza únicamente ejecutables .exe.");
             ResultadoOperacionArchivo? retencion = null;
             if (_retencionAutomatica)
             {
@@ -276,8 +274,8 @@ public partial class Form1
             else
             {
             var archivo = new FileInfo(ruta);
-            if (!ExtensionesServidor.Contains(archivo.Extension))
-                throw new InvalidDataException("La extensión no está admitida por el servidor.");
+            if (!AlcanceAnalisis.AdmiteExtension(archivo.Extension))
+                throw new InvalidDataException("Esta versión analiza únicamente ejecutables .exe.");
             if (archivo.Length <= 0 || archivo.Length > 100L * 1024 * 1024)
                 throw new InvalidDataException("El archivo debe tener entre 1 byte y 100 MiB.");
 
@@ -752,7 +750,7 @@ public partial class Form1
             using var dialogo = new FolderBrowserDialog();
             if (dialogo.ShowDialog(ventana) == DialogResult.OK) ruta.Text = dialogo.SelectedPath;
         };
-        var retener = new CheckBox { Text = "Retener nuevas descargas antes de analizarlas",
+        var retener = new CheckBox { Text = "Retener nuevas descargas .exe antes de analizarlas",
             AutoSize = true, Checked = _retencionAutomatica, Margin = new Padding(3, 16, 3, 6) };
         void Fila(Control control, bool completa = true)
         {
@@ -768,7 +766,7 @@ public partial class Form1
         tabla.Controls.Add(buscar, 1, tabla.RowCount - 1);
         Fila(retener);
         Fila(new Label { AutoSize = true, MaximumSize = new Size(570, 0),
-            Text = "La retención mueve el archivo a cuarentena. Todavía no constituye un bloqueo global de ejecución. La liberación excepcional exige confirmación y autorización de Windows; no cambia la evaluación." });
+            Text = "Esta versión monitorea ejecutables .exe. La retención mueve el archivo a cuarentena. Todavía no constituye un bloqueo global de ejecución. La liberación excepcional exige confirmación y autorización de Windows; no cambia la evaluación." });
         Fila(new Label { AutoSize = true, MaximumSize = new Size(570, 0), Margin = new Padding(3, 12, 3, 12),
             Text = "Los envíos existentes conservan su servidor. Cambiar esta opción no libera archivos retenidos." });
         var botones = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill,

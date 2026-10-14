@@ -102,13 +102,6 @@ var jsonEntrada = new JsonSerializerOptions(JsonSerializerDefaults.Web)
 
 jsonEntrada.Converters.Add(new JsonStringEnumConverter());
 
-var extensionesPermitidas = new HashSet<string>(
-    StringComparer.OrdinalIgnoreCase)
-{
-    ".exe", ".msi", ".bat", ".cmd",
-    ".ps1", ".com", ".scr", ".vbs"
-};
-
 app.MapGet("/", () => Results.Ok(new
 {
     servicio = "SecureGate.Servidor",
@@ -190,7 +183,7 @@ app.MapPost("/api/analisis", async Task<IResult> (
             info.NombreOriginal.Contains('\\') ||
             info.NombreOriginal.Any(char.IsControl) ||
             string.IsNullOrWhiteSpace(info.Extension) ||
-            !extensionesPermitidas.Contains(info.Extension) ||
+            !AlcanceAnalisis.AdmiteExtension(info.Extension) ||
             !string.Equals(
                 Path.GetExtension(info.NombreOriginal),
                 info.Extension,
@@ -199,7 +192,7 @@ app.MapPost("/api/analisis", async Task<IResult> (
             return Results.BadRequest(new
             {
                 codigo = "ARCHIVO_NO_ADMITIDO",
-                mensaje = "El nombre o la extensión no están permitidos."
+                mensaje = "Se requiere un nombre válido y extensión .exe para esta versión."
             });
         }
 

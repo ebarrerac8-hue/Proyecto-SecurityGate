@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using SecureGate.Contratos;
 namespace SecureGate.Monitoreo;
 
 // El monitor comunica eventos; la interfaz decide cómo mostrarlos.
@@ -11,8 +12,6 @@ public sealed class DownloadMonitor : IDisposable
     private readonly ConcurrentDictionary<string, (string Hash, DateTimeOffset Hasta)> _restauraciones = new(StringComparer.OrdinalIgnoreCase);
     public void RegistrarRestauracion(string ruta, string hash) =>
         _restauraciones[Path.GetFullPath(ruta)] = (hash, DateTimeOffset.UtcNow.AddSeconds(30));
-    private static readonly HashSet<string> Extensiones = new(StringComparer.OrdinalIgnoreCase)
-        { ".exe", ".msi", ".bat", ".ps1", ".vbs", ".cmd", ".com", ".scr" };
     public event Action<string>? ArchivoDetectado;
     public event Action<string>? ErrorMonitoreo;
     public string CarpetaActual { get; private set; } = "";
@@ -51,7 +50,7 @@ public sealed class DownloadMonitor : IDisposable
     }
     private void Encolar(string ruta, CancellationToken token)
     {
-        if (!Extensiones.Contains(Path.GetExtension(ruta)) || !_pendientes.TryAdd(ruta, 0)) return;
+        if (!AlcanceAnalisis.AdmiteExtension(Path.GetExtension(ruta)) || !_pendientes.TryAdd(ruta, 0)) return;
         _ = EsperarAsync(ruta, token);
     }
     private async Task EsperarAsync(string ruta, CancellationToken token)
@@ -107,4 +106,3 @@ public sealed class DownloadMonitor : IDisposable
     }
     public void Dispose() => DetenerMonitoreo();
 }
-

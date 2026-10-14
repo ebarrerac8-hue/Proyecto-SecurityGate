@@ -15,5 +15,11 @@
     <Project Path="pruebas/SecureGate.Seguridad.Pruebas/SecureGate.Seguridad.Pruebas.csproj" />
     <Project Path="pruebas/SecureGate.Cliente.Pruebas/SecureGate.Cliente.Pruebas.csproj" />
     <Project Path="pruebas/SecureGate.Ia.Pruebas/SecureGate.Ia.Pruebas.csproj" />
+    <Project Path="pruebas/SecureGate.Defender.Pruebas/SecureGate.Defender.Pruebas.csproj" />
+    <Project Path="pruebas/SecureGate.Defender.Interpretacion.Pruebas/SecureGate.Defender.Interpretacion.Pruebas.csproj" />
+    <Project Path="pruebas/SecureGate.Liberacion.Pruebas/SecureGate.Liberacion.Pruebas.csproj" />
+    <Project Path="pruebas/SecureGate.Reutilizacion.Pruebas/SecureGate.Reutilizacion.Pruebas.csproj" />
+    <Project Path="pruebas/SecureGate.Reutilizacion.Flujo.Pruebas/SecureGate.Reutilizacion.Flujo.Pruebas.csproj" />
+    <Project Path="pruebas/SecureGate.Alcance.Pruebas/SecureGate.Alcance.Pruebas.csproj" />
   </Folder>
 </Solution>
