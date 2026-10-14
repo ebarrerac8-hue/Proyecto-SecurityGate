@@ -19,16 +19,15 @@ public sealed class AnalizadorLocal : IAnalizadorLocal
         var firma = await VerificadorFirmaDigital.VerificarAsync(
             _almacen.Muestra(archivoId), r.Extension, cancellationToken);
         await _almacen.ValidarAsync(r, cancellationToken);
+        var antivirus = await AnalizadorDefender.AnalizarAsync(
+            _almacen.Muestra(archivoId), cancellationToken);
+        await _almacen.ValidarAsync(r, cancellationToken);
         return new ResultadoAnalisisLocal
         {
             Archivo = r.Informacion(), InicioUtc = inicio, FinUtc = DateTimeOffset.UtcNow,
             FirmaDigital = firma,
-            Antivirus = new ResultadoAntivirus
-            {
-                Estado = EstadoComprobacion.NoRealizada,
-                Deteccion = DeteccionAntivirus.NoDeterminada,
-                Detalle = "Integracion con Microsoft Defender pendiente."
-            }
+            Antivirus = antivirus
         };
     }
 }
+
