@@ -23,9 +23,9 @@ namespace SecureGate
             Converters = { new JsonStringEnumConverter() }
         };
 
-        public HistorialPersistencia()
+        public HistorialPersistencia(string? carpeta = null)
         {
-            var carpetaApp = Path.Combine(
+            var carpetaApp = carpeta ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "SecureGate"
             );
@@ -47,7 +47,7 @@ namespace SecureGate
             try
             {
                 var json = await File.ReadAllTextAsync(_rutaHistorial);
-                return JsonSerializer.Deserialize<List<RegistroHistorial>>(json, JsonOpciones) 
+                return JsonSerializer.Deserialize<List<RegistroHistorial>>(json, JsonOpciones)
                     ?? new List<RegistroHistorial>();
             }
             catch (Exception ex)

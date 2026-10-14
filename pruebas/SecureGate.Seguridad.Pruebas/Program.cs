@@ -50,7 +50,27 @@ catch (ErrorClienteAnalisis error) when (error.Codigo == "CLIENTE_NO_AUTORIZADO"
 {
     Console.WriteLine("CORRECTO: credencial enviada y 401 identificado sin reintento");
 }
-Console.WriteLine("LAS SIETE PRUEBAS DE SEGURIDAD TERMINARON CORRECTAMENTE.");
+// Una configuracion ausente no puede convertirse en una credencial publica fija.
+try
+{
+    _ = new AccesoCliente(" ");
+    throw new Exception("El servidor acepto una clave vacia.");
+}
+catch (InvalidOperationException)
+{
+    Console.WriteLine("CORRECTO: servidor rechaza clave vacia sin usar una clave fija.");
+}
+try
+{
+    using var h = new HttpClient();
+    using var c = new ClienteAnalisisHttp(h, new Uri("https://localhost:5443"), " ");
+    throw new Exception("El cliente acepto una clave vacia.");
+}
+catch (InvalidOperationException)
+{
+    Console.WriteLine("CORRECTO: cliente rechaza clave vacia sin usar una clave fija.");
+}
+Console.WriteLine("LAS NUEVE PRUEBAS DE SEGURIDAD TERMINARON CORRECTAMENTE.");
 
 sealed class Simulado(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
 {

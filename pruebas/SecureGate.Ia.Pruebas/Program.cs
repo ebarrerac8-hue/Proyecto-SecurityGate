@@ -45,7 +45,17 @@ static void Comprobar(bool condicion, string mensaje)
     if (!condicion) throw new Exception(mensaje);
 }
 
-using (var handler = new Simulador((_, _) => Task.FromResult(Respuesta(Explicacion()))))
+using (var handler = new Simulador(async (peticion, ct) =>
+{
+    using var cuerpo = JsonDocument.Parse(await peticion.Content!.ReadAsStringAsync(ct));
+    string instrucciones = cuerpo.RootElement.GetProperty("systemInstruction")
+        .GetProperty("parts")[0].GetProperty("text").GetString()!;
+    Comprobar(instrucciones.Contains("liberación excepcional") &&
+        instrucciones.Contains("No afirmes que el servidor prohíbe toda liberación") &&
+        instrucciones.Contains("no autorices ejecutar, instalar ni liberar"),
+        "Las instrucciones confunden límites de evaluación y autorización excepcional.");
+    return Respuesta(Explicacion());
+}))
 using (var http = new HttpClient(handler))
 {
     var original = Resultado();
@@ -148,4 +158,3 @@ internal sealed class Simulador(
         return responder(request, ct);
     }
 }
-

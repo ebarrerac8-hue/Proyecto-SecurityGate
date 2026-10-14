@@ -13,7 +13,12 @@ public static class PreparadorEvidenciasIa
         });
 
         Agregar("Reglas", "Evaluación fijada por el servidor: " + resultado.Evaluacion +
-            ". La IA no autoriza ejecutar ni liberar el archivo.");
+            ". La IA explica evidencias y no concede permisos de ejecución ni liberación. " +
+            "Una evaluación Incompleto no equivale a una amenaza detectada ni determina por sí sola si puede liberarse. " +
+            "La liberación excepcional es una acción separada del cliente: exige análisis terminado, identidad e integridad " +
+            "verificadas, antivirus local completado sin detecciones, ausencia de amenazas detectadas, aceptación " +
+            "explícita del riesgo y autenticación de Windows. No declara seguro el archivo ni cambia la evaluación. " +
+            "Este informe no demuestra que esa autorización se haya solicitado o concedido.");
         Agregar("Archivo", $"Extensión: {resultado.Archivo.Extension}; tamaño: {resultado.Archivo.TamanoBytes} bytes.");
         var local = resultado.AnalisisLocal;
         Agregar("Firma", local is null ? "Sin análisis local." :
@@ -30,6 +35,10 @@ public static class PreparadorEvidenciasIa
             $"Estado: {sandbox.Estado}; muestra ejecutada: {sandbox.MuestraEjecutada}; " +
             $"observador iniciado: {sandbox.ObservadorIniciado}; red: {sandbox.RedHabilitada}; " +
             $"inicio: {sandbox.InicioUtc:o}; fin: {sandbox.FinUtc:o}; eventos: {sandbox.Eventos.Count}.");
+        if (sandbox?.AnalisisOrigenId is { } origen)
+            Agregar("ReutilizacionSandbox", $"Observación histórica reutilizada; análisis de origen: {origen}; " +
+                $"archivo de origen: {NombreMinimo(sandbox.NombreArchivoOrigen)}; reutilización: {sandbox.FechaReutilizacionUtc:o}. " +
+                "No se ejecutó de nuevo el archivo para esta solicitud. Sus fechas y eventos corresponden a la observación original.");
         Agregar("Limitacion",
             "La observación es parcial. No comprueba todo el registro, toda la red ni todos los procesos breves. " +
             "Los eventos de archivo no identifican su autor. Las evidencias del invitado no son resistentes a manipulación.");
@@ -62,4 +71,3 @@ public static class PreparadorEvidenciasIa
         return string.IsNullOrWhiteSpace(nombre) ? "(omitido)" : nombre;
     }
 }
-

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using SecureGate.Contratos;
 namespace SecureGate.Monitoreo;
 
 // El monitor comunica eventos; la interfaz decide cómo mostrarlos.
@@ -8,8 +9,9 @@ public sealed class DownloadMonitor : IDisposable
     private FileSystemWatcher? _watcher;
     private CancellationTokenSource? _cancelacion;
     private readonly ConcurrentDictionary<string, byte> _pendientes = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly HashSet<string> Extensiones = new(StringComparer.OrdinalIgnoreCase)
-        { ".exe", ".msi", ".bat", ".ps1", ".vbs", ".cmd", ".com", ".scr" };
+    private readonly ConcurrentDictionary<string, (string Hash, DateTimeOffset Hasta)> _restauraciones = new(StringComparer.OrdinalIgnoreCase);
+    public void RegistrarRestauracion(string ruta, string hash) =>
+        _restauraciones[Path.GetFullPath(ruta)] = (hash, DateTimeOffset.UtcNow.AddSeconds(30));
     public event Action<string>? ArchivoDetectado;
     public event Action<string>? ErrorMonitoreo;
     public string CarpetaActual { get; private set; } = "";
@@ -48,7 +50,7 @@ public sealed class DownloadMonitor : IDisposable
     }
     private void Encolar(string ruta, CancellationToken token)
     {
-        if (!Extensiones.Contains(Path.GetExtension(ruta)) || !_pendientes.TryAdd(ruta, 0)) return;
+        if (!AlcanceAnalisis.AdmiteExtension(Path.GetExtension(ruta)) || !_pendientes.TryAdd(ruta, 0)) return;
         _ = EsperarAsync(ruta, token);
     }
     private async Task EsperarAsync(string ruta, CancellationToken token)
@@ -75,6 +77,13 @@ public sealed class DownloadMonitor : IDisposable
                     if (estable >= 2)
                     {
                         token.ThrowIfCancellationRequested();
+                        if (_restauraciones.TryGetValue(ruta, out var restaurada))
+                        {
+                            if (restaurada.Hasta > DateTimeOffset.UtcNow &&
+                                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(lectura))
+                                    .Equals(restaurada.Hash, StringComparison.OrdinalIgnoreCase)) return;
+                            _restauraciones.TryRemove(ruta, out _);
+                        }
                         ArchivoDetectado?.Invoke(ruta);
                         return;
                     }

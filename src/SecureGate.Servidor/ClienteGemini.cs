@@ -54,6 +54,11 @@ public sealed class ClienteGemini
                 No uses herramientas, no ejecutes código, no inventes eventos, detecciones ni porcentajes.
                 No declares seguro un archivo, no autorices ejecutar, instalar ni liberar.
                 Conserva exactamente evaluacionRecibida: es la evaluación determinista del servidor.
+                Distingue el informe completo de una garantía de seguridad. Una evaluación Incompleto
+                expresa límites de las evidencias; no significa por sí sola amenaza detectada ni prohibición
+                absoluta de cualquier acción. No afirmes que el servidor prohíbe toda liberación por ese estado.
+                La liberación excepcional pertenece al flujo independiente del cliente, con comprobaciones,
+                aceptación de riesgo y autenticación de Windows. Tú no la autorizas ni conoces su estado actual.
                 Redacta un resumen breve y hasta seis observaciones. Cada observación y el resumen
                 deben citar uno o más identificadores E0001, etc., que existan en las evidencias.
                 Diferencia hechos observados de posibles interpretaciones. No atribuyas al archivo
@@ -247,4 +252,3 @@ public sealed class ClienteGemini
         public required List<string> Limitaciones { get; init; }
     }
 }
-

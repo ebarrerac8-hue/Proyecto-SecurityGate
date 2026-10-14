@@ -2,6 +2,11 @@ namespace SecureGate.Servidor;
 
 public sealed class OpcionesServidor
 {
+    // La observación original puede reutilizarse hasta 30 días; nunca renueva su fecha.
+    public bool ReutilizacionSandboxHabilitada { get; set; } = true;
+    public int InformeRecienteHoras { get; set; } = 24;
+    public int VigenciaSandboxDias { get; set; } = 30;
+
     public bool LimpiezaAutomaticaHabilitada { get; set; } = true;
     public int RetencionMuestrasDias { get; set; } = 7;
     public int TemporalesAbandonadosHoras { get; set; } = 24;
