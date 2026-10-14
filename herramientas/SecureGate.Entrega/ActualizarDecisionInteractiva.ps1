@@ -53,6 +53,22 @@ try {
         Copy-Item -LiteralPath (Join-Path $Entrega $nombre) -Destination $candidato -Recurse
         Copy-Item -Path (Join-Path (Join-Path $publicacion $nombre) '*') -Destination (Join-Path $candidato $nombre) -Recurse -Force
     }
+    foreach ($archivo in Get-ChildItem -LiteralPath $candidato -Recurse -File) {
+        if ($archivo.Extension -in @('.pfx','.p12','.key') -or $archivo.Name -in @('secrets.json','ngrok.yml','ngrok.yaml')) {
+            throw 'Hay un archivo privado en la entrega anterior. No se modificó la publicación ni se creó el ZIP.'
+        }
+        if ($archivo.Extension -in @('.json','.config','.ps1','.cmd','.vbs','.txt','.md')) {
+            $contenido = [IO.File]::ReadAllText($archivo.FullName)
+            foreach ($variable in @('SECUREGATE_CLIENT_TOKEN','SECUREGATE_GEMINI_API_KEY','SECUREGATE_VIRUSTOTAL_API_KEY')) {
+                foreach ($ambito in @('User','Process')) {
+                    $secreto = [Environment]::GetEnvironmentVariable($variable, $ambito)
+                    if (![string]::IsNullOrWhiteSpace($secreto) -and $contenido.Contains($secreto)) {
+                        throw 'Hay una credencial en la entrega. No se modificó la publicación ni se creó el ZIP.'
+                    }
+                }
+            }
+        }
+    }
     # Crear paquetes nuevos antes de cambiar las carpetas de los accesos existentes.
     foreach ($nombre in @('Cliente','Servidor')) {
         Compress-Archive -LiteralPath (Join-Path $candidato $nombre) -DestinationPath (Join-Path $candidato ('SecureGate_' + $nombre + '_Actualizado.zip'))
