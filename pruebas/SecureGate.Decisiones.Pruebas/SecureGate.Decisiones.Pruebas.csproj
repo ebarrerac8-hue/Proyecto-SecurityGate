@@ -8,6 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/SecureGate.Proteccion/SecureGate.Proteccion.csproj" />
-    <Compile Include="../../SecureGateIntegrado_NET10 (1)/SecureGateIntegrado/DecisionArchivoForm.cs" Link="DecisionArchivoForm.cs" />
+    <ProjectReference Include="../../SecureGateIntegrado_NET10 (1)/SecureGateIntegrado/SecureGateIntegrado.csproj" />
   </ItemGroup>
 </Project>

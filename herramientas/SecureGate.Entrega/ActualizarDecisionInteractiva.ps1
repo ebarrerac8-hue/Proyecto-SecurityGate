@@ -53,6 +53,10 @@ try {
         Copy-Item -LiteralPath (Join-Path $Entrega $nombre) -Destination $candidato -Recurse
         Copy-Item -Path (Join-Path (Join-Path $publicacion $nombre) '*') -Destination (Join-Path $candidato $nombre) -Recurse -Force
     }
+    # Crear paquetes nuevos antes de cambiar las carpetas de los accesos existentes.
+    foreach ($nombre in @('Cliente','Servidor')) {
+        Compress-Archive -LiteralPath (Join-Path $candidato $nombre) -DestinationPath (Join-Path $candidato ('SecureGate_' + $nombre + '_Actualizado.zip'))
+    }
     $movidos = [Collections.Generic.List[string]]::new()
     try {
         foreach ($nombre in @('Cliente','Servidor')) {
@@ -69,8 +73,13 @@ try {
         throw 'No se completó la actualización. Se restauraron las carpetas anteriores.'
     }
     Copy-Item -LiteralPath (Join-Path $Proyecto 'README.md') -Destination (Join-Path $Entrega 'ALCANCE_ACTUAL.md') -Force
+    foreach ($nombre in @('Cliente','Servidor')) {
+        $zip = 'SecureGate_' + $nombre + '_Actualizado.zip'
+        if (Test-Path -LiteralPath (Join-Path $Entrega $zip)) { Move-Item -LiteralPath (Join-Path $Entrega $zip) -Destination $respaldo }
+        Move-Item -LiteralPath (Join-Path $candidato $zip) -Destination $Entrega
+    }
     Write-Host 'CORRECTO: cliente y servidor actualizados; lanzadores y rutas conservados.'
     Write-Host "Respaldo: $respaldo"
     Write-Host 'Inicia manualmente servidor, túnel y cliente. La prueba real del cuadro requiere una nueva descarga .exe.'
-    Write-Host 'Los ZIP anteriores no se actualizaron: prepara un ZIP nuevo de Cliente para tus compañeros.'
+    Write-Host ('Paquete para compañeros: ' + (Join-Path $Entrega 'SecureGate_Cliente_Actualizado.zip'))
 } finally { Pop-Location }

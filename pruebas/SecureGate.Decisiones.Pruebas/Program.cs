@@ -12,8 +12,11 @@ internal static class Program
     private static void Main()
     {
         PruebasAsync().GetAwaiter().GetResult();
-        ApplicationConfiguration.Initialize();
+        Application.SetHighDpiMode(HighDpiMode.SystemAware);
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
         ProbarDialogos();
+        ProbarClienteOculto();
         Console.WriteLine("Pruebas de decisión y diálogos aprobadas; sin claves, malware ni apertura real de ejecutables.");
     }
 
@@ -196,6 +199,70 @@ internal static class Program
         using var imagen = new Bitmap(ventana.Width, ventana.Height);
         ventana.DrawToBitmap(imagen, new Rectangle(Point.Empty, imagen.Size));
         imagen.Save(Path.Combine(destino, nombre + ".png"));
+    }
+
+    private static void ProbarClienteOculto()
+    {
+        string raiz = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SecureGate", "PruebasDecisiones", "Cliente_" + Guid.NewGuid().ToString("N"));
+        string? anterior = Environment.GetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR");
+        Environment.SetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR", raiz);
+        Directory.CreateDirectory(raiz);
+        try
+        {
+            var gestor = new GestorCuarentena(Path.Combine(raiz, "Cuarentena"));
+            var envios = new List<EnvioCliente>();
+            foreach (string nombre in new[] { "Primero.exe", "Segundo.exe" })
+            {
+                string ruta = Path.Combine(raiz, nombre);
+                File.WriteAllText(ruta, "Archivo inerte para prueba de cuadro central.");
+                var retencion = Task.Run(() => gestor.RetenerAsync(ruta)).GetAwaiter().GetResult();
+                var id = Guid.NewGuid();
+                var informe = Informe(retencion.Archivo!, id);
+                envios.Add(new EnvioCliente { Solicitud = new() { SolicitudId = Guid.NewGuid(), AnalisisLocal = informe.AnalisisLocal! },
+                    RutaArchivo = Path.Combine(raiz, "Cuarentena", retencion.ArchivoId + ".bytes"),
+                    Servidor = "https://pruebas.invalid/", AnalisisId = id, Resultado = informe, DecisionUsuarioPendiente = true });
+            }
+            using var cliente = new Form1();
+            _ = cliente.Handle; // Crear el hilo/handle sin disparar Shown ni iniciar servicios reales.
+            cliente.Hide();
+            var encolar = typeof(Form1).GetMethod("EncolarDecision", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            var vistos = new List<string>();
+            var limite = DateTime.UtcNow.AddSeconds(15);
+            using var reloj = new System.Windows.Forms.Timer { Interval = 50 };
+            reloj.Tick += (_, _) =>
+            {
+                var cuadro = Application.OpenForms.OfType<DecisionArchivoForm>().FirstOrDefault();
+                if (DateTime.UtcNow >= limite) { cuadro?.Close(); return; }
+                if (cuadro is null) return;
+                vistos.Add(Controles(cuadro).OfType<Label>().Single(l => l.Text.EndsWith(".exe")).Text);
+                Capturar(cuadro, "ClienteOculto_" + vistos.Count);
+                Controles(cuadro).OfType<Button>().Single(b => b.Name == "Mantener").PerformClick();
+            };
+            reloj.Start();
+            encolar.Invoke(cliente, new object[] { envios[0] });
+            encolar.Invoke(cliente, new object[] { envios[0] }); // Reintento del mismo resultado.
+            encolar.Invoke(cliente, new object[] { envios[1] });
+            while (DateTime.UtcNow < limite && (vistos.Count < 2 || envios.Any(e => e.DecisionUsuarioPendiente)))
+            {
+                Application.DoEvents();
+                Thread.Sleep(10);
+            }
+            reloj.Stop();
+            Exigir(vistos.SequenceEqual(new[] { "Primero.exe", "Segundo.exe" }) && !cliente.Visible,
+                "cliente oculto muestra automáticamente dos cuadros centrales, en orden y sin duplicados.");
+            var recuperados = Task.Run(() => new AlmacenEnviosCliente(Path.Combine(raiz, "Envios")).ListarAsync()).GetAwaiter().GetResult();
+            Exigir(recuperados.Count == 2 && recuperados.All(e => !e.DecisionUsuarioPendiente && e.DecisionUsuario == "MantenerRetenido") &&
+                envios.All(e => File.Exists(e.RutaArchivo)), "decisiones del cliente real persisten y conservan ambas muestras.");
+            // Cerrar recursos mediante el mismo evento FormClosed de producción.
+            typeof(Form1).GetField("_salir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(cliente, true);
+            cliente.Close();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR", anterior);
+            if (Directory.Exists(raiz)) Directory.Delete(raiz, true);
+        }
     }
 
     private sealed class ServidorSimulado(Func<ResultadoAnalisis> respuesta) : HttpMessageHandler
