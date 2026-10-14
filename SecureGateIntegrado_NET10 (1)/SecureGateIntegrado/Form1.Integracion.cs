@@ -34,7 +34,7 @@ public partial class Form1
     private readonly Button _reintentar = new() { Text = "🔁 Recuperar resultado", AutoSize = true, Enabled = false };
     private readonly Button _eliminar = new() { Text = "🗑️  Eliminar", AutoSize = true, Enabled = false };
     private readonly Button _liberar = new() { Text = "Liberar bajo mi responsabilidad", AutoSize = true, Enabled = false };
-    private readonly Button _exportar = new() { Text = "📥 Exportar TXT", AutoSize = true, Enabled = false };
+    private readonly Button _exportar = new() { Text = "Exportar informe…", AutoSize = true, Enabled = false };
     private static readonly JsonSerializerOptions JsonInforme = CrearJsonInforme();
     private static readonly HashSet<string> ExtensionesServidor = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -43,7 +43,7 @@ public partial class Form1
 
     private void PrepararIntegracion()
     {
-        MinimumSize = new Size(1100, 650);
+        MinimumSize = new Size(1000, 620);
         panelRight.AutoScroll = true;
         groupBoxSummary.Height = 330;
         tableSummary.ColumnStyles.Clear();
@@ -101,6 +101,8 @@ public partial class Form1
         acciones.Controls.AddRange(new Control[] { _reanudar, _pausar, _reintentar, _eliminar, _liberar, _exportar });
         panelRight.Controls.Add(acciones);
         panelRight.Controls.SetChildIndex(acciones, 0);
+
+        OrganizarPantalla(acciones);
 
         // Event handlers
         _reanudar.Click += async (_, _) => await ReanudarPendientesAsync();
@@ -551,6 +553,7 @@ public partial class Form1
             listViewRecent.Items.Insert(0, fila);
         }
         fila.Tag = envio;
+        fila.ToolTipText = archivo.NombreOriginal + "\n" + envio.RutaArchivo + "\n" + envio.EstadoLocal;
         fila.SubItems[3].Text = envio.EstadoLocal.StartsWith("Archivo liberado") || envio.EstadoLocal.StartsWith("Archivo eliminado")
             ? envio.EstadoLocal : envio.Terminado && envio.Resultado is not null
             ? RiesgoAmigable(envio.Resultado.Evaluacion) : envio.EstadoLocal;

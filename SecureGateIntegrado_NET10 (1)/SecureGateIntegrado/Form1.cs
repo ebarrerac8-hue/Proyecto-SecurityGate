@@ -97,23 +97,21 @@ namespace SecureGate
         private void CenterSelectButton()
         {
             if (dragPanel == null || selectFileButton == null || lblDrag == null) return;
-            // Centrar horizontal
-            selectFileButton.Left = Math.Max(16, (dragPanel.ClientSize.Width - selectFileButton.Width) / 2);
-            // Colocar cerca del centro vertical, dejando espacio para subtitle
-            selectFileButton.Top = Math.Max(16, (dragPanel.ClientSize.Height / 2) + 20);
-            // Ajustar lblDrag padding para que no tape el botón
-            // Ajustar tamaño y posición del label para reservar espacio para el icono
-            lblDrag.Width = Math.Max(200, dragPanel.ClientSize.Width - 40);
-            lblDrag.Left = 20;
-            // Posicionar icono fijo arriba y centrar horizontalmente
-            if (pictureBoxIcon != null)
-            {
-                pictureBoxIcon.Left = Math.Max(16, (dragPanel.ClientSize.Width - pictureBoxIcon.Width) / 2);
-                pictureBoxIcon.Top = 16; // fijo a 16px del borde superior
-                pictureBoxIcon.BringToFront();
-                // Colocar el label debajo del icono
-                lblDrag.Top = pictureBoxIcon.Bottom + 12;
-            }
+            int espacio = Math.Max(8, (int)(12 * DeviceDpi / 96f));
+            int icono = (int)(48 * DeviceDpi / 96f);
+            pictureBoxIcon.SetBounds(espacio, espacio, icono, icono);
+            pictureBoxIcon.SizeMode = PictureBoxSizeMode.Zoom;
+            lblDrag.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblDrag.Text = "Arrastrá un archivo admitido\n o seleccioná uno para analizar";
+            lblDrag.TextAlign = ContentAlignment.MiddleLeft;
+            lblDrag.SetBounds(pictureBoxIcon.Right + espacio, espacio,
+                Math.Max(100, dragPanel.ClientSize.Width - pictureBoxIcon.Right - espacio * 2), icono);
+            selectFileButton.AutoSize = true;
+            selectFileButton.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            selectFileButton.Padding = new Padding(12, 6, 12, 6);
+            selectFileButton.Text = "Seleccionar archivo…";
+            selectFileButton.Location = new Point(espacio, pictureBoxIcon.Bottom + espacio);
+            dragPanel.Height = selectFileButton.Bottom + espacio * 2;
         }
 
         private void changeLogoButton_Click(object sender, EventArgs e)

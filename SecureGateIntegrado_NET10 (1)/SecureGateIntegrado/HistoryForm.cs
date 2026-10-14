@@ -17,7 +17,9 @@ namespace SecureGate
             _items = items;
             Text = "Historial — SecureGate";
             StartPosition = FormStartPosition.CenterParent;
-            Width = 1000;
+            AutoScaleMode = AutoScaleMode.Font;
+            MinimumSize = new Size(800, 500);
+            Width = 1100;
             Height = 680;
             Font = new Font("Segoe UI", 10F);
             BackColor = Color.FromArgb(245, 247, 250);
@@ -72,6 +74,11 @@ namespace SecureGate
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
                 AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells,
+                ShowCellToolTips = true,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 BorderStyle = BorderStyle.None,
                 BackgroundColor = Color.White,
@@ -88,13 +95,22 @@ namespace SecureGate
                     BackColor = Color.White,
                     SelectionBackColor = Color.FromArgb(219, 234, 254),
                     SelectionForeColor = Color.FromArgb(17, 24, 39),
-                    Padding = new Padding(4)
+                    Padding = new Padding(4),
+                    WrapMode = DataGridViewTriState.True
                 }
             };
             _grid.Columns.Add("Nombre", "Nombre");
             _grid.Columns.Add("Origen", "Origen");
             _grid.Columns.Add("Fecha", "Fecha");
             _grid.Columns.Add("Estado", "Estado");
+
+            int[] anchosMinimos = { 180, 220, 150, 260 };
+            float[] pesos = { 22, 30, 18, 30 };
+            for (int i = 0; i < _grid.Columns.Count; i++)
+            {
+                _grid.Columns[i].MinimumWidth = anchosMinimos[i];
+                _grid.Columns[i].FillWeight = pesos[i];
+            }
 
             var separator2 = new Panel { Height = 12, Dock = DockStyle.Top, BackColor = Color.FromArgb(245, 247, 250) };
 
@@ -130,7 +146,7 @@ namespace SecureGate
             closeBtn.Click += (_, _) => Close();
             closeBtn.Margin = new Padding(8, 0, 0, 0);
 
-            var flowActions = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.RightToLeft, AutoSize = true };
+            var flowActions = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, WrapContents = false };
             flowActions.Controls.Add(closeBtn);
             flowActions.Controls.Add(exportBtn);
 
@@ -144,6 +160,7 @@ namespace SecureGate
 
             Controls.Add(actionsPanel);
             Controls.Add(container);
+            container.BringToFront();
 
             Load += HistoryForm_Load;
         }
@@ -154,7 +171,8 @@ namespace SecureGate
             try
             {
                 int totalItems = 0;
-                int limpios = 0;
+                int sinIndicadores = 0;
+                int incompletos = 0;
                 int sospechosos = 0;
                 int maliciosos = 0;
 
@@ -168,29 +186,23 @@ namespace SecureGate
                     int idx = _grid.Rows.Add(nombre, origen, fecha, estado);
                     totalItems++;
 
-                    // Contar estados y colorear
-                    if (estado.Contains("Limpio"))
-                    {
-                        limpios++;
-                        if (_grid.Rows[idx] is DataGridViewRow row)
-                            row.DefaultCellStyle.BackColor = Color.FromArgb(240, 253, 244);
-                    }
-                    else if (estado.Contains("Malicioso"))
+                    // Los estados son los que muestra el cliente; no equivalen a archivos seguros.
+                    if (estado.Contains("Sin indicadores detectados")) sinIndicadores++;
+                    else if (estado.Contains("Amenaza reportada"))
                     {
                         maliciosos++;
-                        if (_grid.Rows[idx] is DataGridViewRow row)
-                            row.DefaultCellStyle.BackColor = Color.FromArgb(254, 242, 242);
+                        _grid.Rows[idx].DefaultCellStyle.BackColor = Color.FromArgb(254, 242, 242);
                     }
-                    else if (estado.Contains("Sospechoso"))
+                    else if (estado.Contains("Requiere precaución"))
                     {
                         sospechosos++;
-                        if (_grid.Rows[idx] is DataGridViewRow row)
-                            row.DefaultCellStyle.BackColor = Color.FromArgb(255, 252, 235);
+                        _grid.Rows[idx].DefaultCellStyle.BackColor = Color.FromArgb(255, 252, 235);
                     }
+                    else if (estado.Contains("Evaluación incompleta")) incompletos++;
                 }
 
                 var sb = new StringBuilder();
-                sb.Append($"📊 Total: {totalItems}  |  ✅ Limpios: {limpios}  |  ⚠️ Sospechosos: {sospechosos}  |  ❌ Maliciosos: {maliciosos}");
+                sb.Append($"Total: {totalItems} | Sin indicadores: {sinIndicadores} | Incompletos: {incompletos} | Precaución: {sospechosos} | Amenazas: {maliciosos}");
                 _infoLabel.Text = sb.ToString();
             }
             catch (Exception ex)
