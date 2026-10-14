@@ -9,7 +9,7 @@ namespace SecureGate;
 internal static class ListadoAnalisis
 {
     internal static void Construir(Form ventana, string titulo, string exportacion,
-        EventHandler exportar, out DataGridView grid, out Label resumen)
+        EventHandler exportar, out DataGridView grid, out Label resumen, Control? filtros = null)
     {
         ventana.SuspendLayout();
         ventana.Font = new Font("Segoe UI", 10F);
@@ -20,10 +20,11 @@ internal static class ListadoAnalisis
         ventana.BackColor = Color.FromArgb(245, 247, 250);
         var tabla = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5,
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6,
             Padding = new Padding(12)
         };
         tabla.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         tabla.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         tabla.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -67,8 +68,8 @@ internal static class ListadoAnalisis
                 Padding = new Padding(4), WrapMode = DataGridViewTriState.True
             }
         };
-        string[] nombres = { "Nombre", "Ubicación de la muestra", "Fecha", "Estado del archivo", "Evaluación" };
-        float[] pesos = { 22, 25, 16, 22, 15 };
+        string[] nombres = { "Nombre", "Ubicación de la muestra", "Fecha", "Estado del archivo", "Resultado", "Procesamiento" };
+        float[] pesos = { 20, 22, 14, 12, 20, 12 };
         for (int i = 0; i < nombres.Length; i++)
         {
             grid.Columns.Add("Columna" + i, nombres[i]);
@@ -90,7 +91,8 @@ internal static class ListadoAnalisis
         var listado = grid;
         listado.SelectionChanged += (_, _) =>
         {
-            if (listado.CurrentRow is not { } fila) return;
+            if (listado.CurrentRow is not { } fila)
+            { detalle.Text = "No hay una fila seleccionada."; return; }
             var texto = new StringBuilder();
             for (int i = 0; i < listado.Columns.Count; i++)
                 texto.AppendLine(listado.Columns[i].HeaderText + ": " + fila.Cells[i].Value);
@@ -120,9 +122,10 @@ internal static class ListadoAnalisis
         ventana.CancelButton = cerrar;
         tabla.Controls.Add(encabezado, 0, 0);
         tabla.Controls.Add(resumen, 0, 1);
-        tabla.Controls.Add(grid, 0, 2);
-        tabla.Controls.Add(grupo, 0, 3);
-        tabla.Controls.Add(botones, 0, 4);
+        if (filtros is not null) tabla.Controls.Add(filtros, 0, 2);
+        tabla.Controls.Add(grid, 0, 3);
+        tabla.Controls.Add(grupo, 0, 4);
+        tabla.Controls.Add(botones, 0, 5);
         ventana.Controls.Add(tabla);
         var etiqueta = resumen;
         tabla.SizeChanged += (_, _) =>
@@ -134,40 +137,28 @@ internal static class ListadoAnalisis
         ventana.ResumeLayout(true);
     }
 
-    internal static string Cargar(ListView.ListViewItemCollection items, DataGridView grid)
+    internal static string Cargar(IEnumerable<ListViewItem> items, DataGridView grid)
     {
-        int sinIndicadores = 0, incompletos = 0, precaucion = 0, amenazas = 0, pendientes = 0;
-        foreach (ListViewItem item in items)
+        var filas = items.ToList();
+        grid.Rows.Clear();
+        int sinAmenazas = 0, amenazas = 0, precaucion = 0, pendientes = 0;
+        foreach (var item in filas)
         {
             string Campo(int i) => item.SubItems.Count > i ? item.SubItems[i].Text : "";
-            var resultado = (item.Tag as EnvioCliente)?.Resultado;
-            string evaluacion;
-            if (resultado is null || resultado.Estado != EstadoAnalisis.Completado)
-            {
-                evaluacion = "Sin evaluación final";
-                pendientes++;
-            }
-            else
-            {
-                switch (resultado.Evaluacion)
-                {
-                    case EvaluacionRiesgo.SinIndicadoresDetectados:
-                        evaluacion = "Sin indicadores detectados"; sinIndicadores++; break;
-                    case EvaluacionRiesgo.AmenazaDetectada:
-                        evaluacion = "Amenaza reportada"; amenazas++; break;
-                    case EvaluacionRiesgo.Sospechoso:
-                        evaluacion = "Requiere precaución"; precaucion++; break;
-                    default:
-                        evaluacion = "Evaluación incompleta"; incompletos++; break;
-                }
-            }
-            int indice = grid.Rows.Add(Campo(0), Campo(1), Campo(2), Campo(3), evaluacion);
+            var envio = item.Tag as EnvioCliente;
+            string resultado = envio is null ? PresentacionAnalisis.EnCurso : PresentacionAnalisis.Resultado(envio);
+            if (resultado == PresentacionAnalisis.SinAmenazas) sinAmenazas++;
+            else if (resultado == PresentacionAnalisis.Amenaza) amenazas++;
+            else if (resultado == PresentacionAnalisis.Precaucion) precaucion++;
+            else pendientes++;
+            int indice = grid.Rows.Add(Campo(0), Campo(1), Campo(2),
+                envio is null ? Campo(3) : PresentacionAnalisis.EstadoArchivo(envio),
+                resultado, envio is null ? "Sin datos" : PresentacionAnalisis.Procesamiento(envio));
             var fila = grid.Rows[indice];
-            foreach (DataGridViewCell celda in fila.Cells)
-                celda.ToolTipText = celda.Value?.ToString() ?? "";
-            if (resultado?.Evaluacion == EvaluacionRiesgo.AmenazaDetectada)
+            foreach (DataGridViewCell celda in fila.Cells) celda.ToolTipText = celda.Value?.ToString() ?? "";
+            if (resultado == PresentacionAnalisis.Amenaza)
                 fila.DefaultCellStyle.BackColor = Color.FromArgb(254, 242, 242);
-            else if (resultado?.Evaluacion == EvaluacionRiesgo.Sospechoso)
+            else if (resultado == PresentacionAnalisis.Precaucion)
                 fila.DefaultCellStyle.BackColor = Color.FromArgb(255, 252, 235);
         }
         if (grid.Rows.Count > 0)
@@ -176,8 +167,7 @@ internal static class ListadoAnalisis
             grid.CurrentCell = grid.Rows[0].Cells[0];
             grid.Rows[0].Selected = true;
         }
-        return $"Total: {items.Count} | Sin indicadores: {sinIndicadores} | Incompletos: {incompletos}\n" +
-            $"Precaución: {precaucion} | Amenazas: {amenazas} | Sin evaluación final: {pendientes}";
+        return $"Sin amenazas reportadas: {sinAmenazas} | Precaución: {precaucion} | Amenazas: {amenazas} | Pendientes/sin resultado: {pendientes}";
     }
 
     internal static void Exportar(Form ventana, DataGridView grid, string resumen, string nombre)

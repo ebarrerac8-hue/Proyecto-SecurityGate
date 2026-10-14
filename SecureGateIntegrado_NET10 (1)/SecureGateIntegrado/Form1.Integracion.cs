@@ -556,7 +556,7 @@ public partial class Form1
         fila.ToolTipText = archivo.NombreOriginal + "\n" + envio.RutaArchivo + "\n" + envio.EstadoLocal;
         fila.SubItems[3].Text = envio.EstadoLocal.StartsWith("Archivo liberado") || envio.EstadoLocal.StartsWith("Archivo eliminado")
             ? envio.EstadoLocal : envio.Terminado && envio.Resultado is not null
-            ? RiesgoAmigable(envio.Resultado.Evaluacion) : envio.EstadoLocal;
+            ? PresentacionAnalisis.Resultado(envio) : envio.EstadoLocal;
     }
 
     private void MostrarSeleccion()
@@ -580,10 +580,9 @@ public partial class Form1
                 ? "" : "\nCertificado: " + envio.Solicitud.AnalisisLocal.FirmaDigital.Firmante);
         lblReputation.Text = envio.Resultado?.Reputacion?.Detalle ??
             "Consulta de reputación a cargo del servidor.";
-        lblSandboxTitle.Text = envio.Resultado is null
-            ? envio.EstadoLocal : RiesgoAmigable(envio.Resultado.Evaluacion);
-        lblSandboxStatus.Text = envio.Resultado?.Resumen ?? envio.UltimoError ??
-            "El archivo se enviará al servidor para su análisis.";
+        lblSandboxTitle.Text = PresentacionAnalisis.Procesamiento(envio);
+        lblSandboxStatus.Text = "Resultado: " + PresentacionAnalisis.Resultado(envio) + "\n\n" +
+            PresentacionAnalisis.Informe(envio) + "\n\n" + PresentacionAnalisis.Alcance(envio);
         btnConfigureSandbox.Enabled = true;
 
         // Habilitar/deshabilitar botones según estado
@@ -643,7 +642,7 @@ public partial class Form1
         catch (Exception error) { MessageBox.Show(this, "No se pudo exportar: " + error.Message); }
     }
 
-    private static string CrearInforme(EnvioCliente envio)
+    internal static string CrearInforme(EnvioCliente envio)
     {
         var texto = new StringBuilder();
         var archivo = envio.Solicitud.AnalisisLocal.Archivo;
@@ -670,7 +669,12 @@ public partial class Form1
         }
         var resultado = envio.Resultado;
         texto.AppendLine("Estado: " + EstadoAmigable(resultado.Estado));
-        texto.AppendLine("Evaluación: " + RiesgoAmigable(resultado.Evaluacion));
+        texto.AppendLine("Procesamiento: " + PresentacionAnalisis.Procesamiento(envio));
+        texto.AppendLine("Informe: " + PresentacionAnalisis.Informe(envio));
+        texto.AppendLine("Resultado visible: " + PresentacionAnalisis.Resultado(envio));
+        texto.AppendLine("Alcance: " + PresentacionAnalisis.Alcance(envio));
+        texto.AppendLine("Evaluación técnica original: " + resultado.Evaluacion);
+        texto.AppendLine("Estado técnico de evaluación: " + resultado.Evaluacion);
         texto.AppendLine("Resumen: " + resultado.Resumen);
         texto.AppendLine("Reputación: " + resultado.Reputacion?.Detalle);
         texto.AppendLine("Código de error: " + resultado.CodigoError);
@@ -862,7 +866,7 @@ public partial class Form1
         EvaluacionRiesgo.AmenazaDetectada => "Amenaza reportada",
         EvaluacionRiesgo.Sospechoso => "Requiere precaución",
         EvaluacionRiesgo.SinIndicadoresDetectados => "Sin indicadores detectados",
-        _ => "Evaluación incompleta"
+        _ => "Requiere revisión"
     };
 
     private static JsonSerializerOptions CrearJsonInforme()
@@ -983,5 +987,3 @@ public partial class Form1
         public bool RetencionAutomatica { get; init; }
     }
 }
-
-
