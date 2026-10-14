@@ -175,7 +175,14 @@ internal static class Program
                 "abrir solo aparece en el resultado favorable: " + tipo);
             using var reloj = new System.Windows.Forms.Timer { Interval = 50 };
             reloj.Tick += (_, _) => { reloj.Stop(); dialogo.Close(); };
-            dialogo.Shown += (_, _) => { Capturar(dialogo, tipo.ToString()); reloj.Start(); };
+            dialogo.Shown += (_, _) =>
+            {
+                var acciones = Controles(dialogo).OfType<Button>().ToArray();
+                Exigir(acciones.Select(b => b.Size).Distinct().Count() == 1 &&
+                    acciones.Select(b => b.Top).Distinct().Count() == 1,
+                    "botones iguales en una sola fila: " + tipo);
+                Capturar(dialogo, tipo.ToString()); reloj.Start();
+            };
             dialogo.ShowDialog();
             Exigir(dialogo.Accion == AccionDecisionArchivo.Mantener, "cerrar el cuadro conserva retención: " + tipo);
         }

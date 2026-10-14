@@ -58,7 +58,7 @@ public partial class Form1
         catch (OperationCanceledException) when (_salida.IsCancellationRequested) { }
         catch (Exception error)
         {
-            if (!_cerrado) MessageBox.Show(error.Message + "\nRevisá el estado del archivo en SecureGate.",
+            if (!_cerrado) MessageBox.Show(error.Message + "\nConsulte el estado del archivo en SecureGate.",
                 "No se completó la decisión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally
@@ -97,7 +97,7 @@ public partial class Form1
         var gestor = new GestorCuarentena(EntornoCliente.CarpetaCuarentena);
         if (accion == AccionDecisionArchivo.Eliminar)
         {
-            if (MessageBox.Show("¿Eliminar definitivamente " + archivo.NombreOriginal + "? El informe se conservará.",
+            if (MessageBox.Show("¿Desea eliminar definitivamente " + archivo.NombreOriginal + "? El informe se conservará.",
                 "Eliminar archivo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                 MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
             var operacion = await gestor.EliminarAsync(archivo.ArchivoId, _salida.Token);
@@ -143,7 +143,7 @@ public partial class Form1
                     "\nUbicación: " + registro.RutaOriginal, "SecureGate", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
-        else MessageBox.Show("Archivo devuelto a:\n" + registro.RutaOriginal + "\n\nNo se ejecutó. Podés abrirlo cuando decidás.", "SecureGate");
+        else MessageBox.Show("Archivo restaurado.\nUbicación: " + registro.RutaOriginal + "\nNo se ha ejecutado.", "SecureGate");
     }
 
     private async Task GuardarDecisionAsync(EnvioCliente envio, string decision)
