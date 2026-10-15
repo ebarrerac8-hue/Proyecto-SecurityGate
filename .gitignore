@@ -484,3 +484,7 @@ $RECYCLE.BIN/
 # Salidas publicadas locales de SecureGate
 /entrega/
 /herramientas/SecureGate.Entrega/ultima-entrega-local.json
+
+# Paquetes privados de conexion del cliente
+conexion-cliente.privado.json
+SecureGate_Cliente_Listo_*.zip

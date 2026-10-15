@@ -15,6 +15,8 @@ internal static class Program
         Application.SetHighDpiMode(HighDpiMode.SystemAware);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        ProbarPaquete();
+        ProbarProgreso();
         ProbarDialogos();
         ProbarClienteOculto();
         Console.WriteLine("Pruebas de decisión y diálogos aprobadas; sin claves, malware ni apertura real de ejecutables.");
@@ -165,6 +167,45 @@ internal static class Program
     }
 
     private static IEnumerable<Control> Controles(Control c) => c.Controls.Cast<Control>().SelectMany(h => new[] { h }.Concat(Controles(h)));
+    private static void ProbarPaquete()
+    {
+        string ruta = Path.GetTempFileName();
+        string? anterior = Environment.GetEnvironmentVariable("SECUREGATE_CLIENT_TOKEN");
+        try
+        {
+            string clave = Convert.ToBase64String(new byte[32]); // Credencial sintética, sin acceso real.
+            File.WriteAllText(ruta, JsonSerializer.Serialize(new { Servidor = "https://pruebas.invalid/", ClaveCliente = clave }));
+            var paquete = PaqueteCliente.Cargar(ruta);
+            Exigir(paquete?.Servidor == "https://pruebas.invalid/" && Environment.GetEnvironmentVariable("SECUREGATE_CLIENT_TOKEN") == clave,
+                "paquete carga URL y acceso sin intervención ni variables previas del usuario.");
+            foreach (string servidor in new[] { "http://pruebas.invalid/", "https://localhost:5443/", "https://usuario:clave@pruebas.invalid/", "https://pruebas.invalid/?clave=1" })
+            {
+                File.WriteAllText(ruta, JsonSerializer.Serialize(new { Servidor = servidor, ClaveCliente = clave }));
+                bool rechazado = false;
+                try { PaqueteCliente.Cargar(ruta); } catch (InvalidDataException) { rechazado = true; }
+                Exigir(rechazado, "paquete rechaza URL inválida sin exponer credenciales.");
+            }
+            File.WriteAllText(ruta, JsonSerializer.Serialize(new { Servidor = "https://pruebas.invalid/", ClaveCliente = "incorrecta" }));
+            bool invalido = false;
+            try { PaqueteCliente.Cargar(ruta); } catch (InvalidDataException) { invalido = true; }
+            Exigir(invalido, "clave inválida se detecta antes de monitorear.");
+        }
+        finally { File.Delete(ruta); Environment.SetEnvironmentVariable("SECUREGATE_CLIENT_TOKEN", anterior); }
+    }
+
+    private static void ProbarProgreso()
+    {
+        using var progreso = new ProgresoArchivoForm("Descarga.exe");
+        progreso.Show(); Application.DoEvents();
+        Exigir(progreso.MinimizeBox && !Controles(progreso).OfType<Button>().Any(), "progreso pequeño con minimizar y cerrar, sin botón Ocultar.");
+        progreso.Actualizar("Consultando servidor…");
+        Capturar(progreso, "Progreso");
+        progreso.WindowState = FormWindowState.Minimized; Application.DoEvents();
+        Exigir(!progreso.Visible, "minimizar oculta progreso sin cancelar.");
+        progreso.Close(); progreso.Actualizar("Finalizado");
+        Exigir(progreso.IsDisposed, "cerrar progreso permite descartar su ventana y recibir actualizaciones tardías.");
+    }
+
     private static void ProbarDialogos()
     {
         foreach (var tipo in Enum.GetValues<TipoResultadoDecision>())
@@ -173,6 +214,10 @@ internal static class Program
             var botones = Controles(dialogo).OfType<Button>().ToList();
             Exigir(botones.Any(b => b.Name == "DevolverYAbrir") == (tipo == TipoResultadoDecision.SinAmenazasReportadas),
                 "abrir solo aparece en el resultado favorable: " + tipo);
+            if (tipo == TipoResultadoDecision.SinAmenazasReportadas)
+                Exigir(botones.Select(b => b.Text).SequenceEqual(new[] { "Abrir", "Mover a Descargas" }) ||
+                    botones.Select(b => b.Text).SequenceEqual(new[] { "Mover a Descargas", "Abrir" }),
+                    "resultado favorable tiene exactamente dos acciones claras.");
             using var reloj = new System.Windows.Forms.Timer { Interval = 50 };
             reloj.Tick += (_, _) => { reloj.Stop(); dialogo.Close(); };
             dialogo.Shown += (_, _) =>
@@ -259,7 +304,7 @@ internal static class Program
                 if (cuadro is null) return;
                 vistos.Add(Controles(cuadro).OfType<Label>().Single(l => l.Text.EndsWith(".exe")).Text);
                 Capturar(cuadro, "ClienteOculto_" + vistos.Count);
-                Controles(cuadro).OfType<Button>().Single(b => b.Name == "Mantener").PerformClick();
+                cuadro.Close(); // X conserva retención incluso sin un tercer botón en el resultado favorable.
             };
             reloj.Start();
             encolar.Invoke(cliente, new object[] { envios[0] });
@@ -276,6 +321,32 @@ internal static class Program
             var recuperados = Task.Run(() => new AlmacenEnviosCliente(Path.Combine(raiz, "Envios")).ListarAsync()).GetAwaiter().GetResult();
             Exigir(recuperados.Count == 2 && recuperados.All(e => !e.DecisionUsuarioPendiente && e.DecisionUsuario == "MantenerRetenido") &&
                 envios.All(e => File.Exists(e.RutaArchivo)), "decisiones del cliente real persisten y conservan ambas muestras.");
+            // Reanudar un envío real usando transporte simulado: cerrar progreso no corta su tarea.
+            var envioProgreso = envios[0];
+            envioProgreso.DecisionUsuarioPendiente = true;
+            envioProgreso.Resultado = null;
+            var clientes = (Dictionary<string, ClienteAnalisisHttp>)typeof(Form1).GetField("_clientes",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(cliente)!;
+            using var transporte = new HttpClient(new ServidorSimulado(() => Informe(envioProgreso.Solicitud.AnalisisLocal.Archivo, envioProgreso.AnalisisId!.Value)));
+            clientes.Add("https://pruebas.invalid/", new ClienteAnalisisHttp(transporte, new Uri("https://pruebas.invalid/"), Convert.ToBase64String(new byte[32])));
+            var reanudar = typeof(Form1).GetMethod("ReanudarEnvioAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            bool progresoCerrado = false, resultadoVisto = false;
+            using var relojProgreso = new System.Windows.Forms.Timer { Interval = 20 };
+            relojProgreso.Tick += (_, _) =>
+            {
+                var progreso = Application.OpenForms.OfType<ProgresoArchivoForm>().FirstOrDefault();
+                if (progreso is not null) { progreso.Close(); progresoCerrado = true; }
+                var resultado = Application.OpenForms.OfType<DecisionArchivoForm>().FirstOrDefault();
+                if (resultado is not null) { resultadoVisto = true; resultado.Close(); }
+            };
+            relojProgreso.Start();
+            var tarea = (Task)reanudar.Invoke(cliente, new object[] { envioProgreso })!;
+            limite = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < limite && (!tarea.IsCompleted || !resultadoVisto))
+            { Application.DoEvents(); Thread.Sleep(10); }
+            relojProgreso.Stop(); tarea.GetAwaiter().GetResult();
+            Exigir(progresoCerrado && resultadoVisto && envioProgreso.Terminado && File.Exists(envioProgreso.RutaArchivo),
+                "cerrar progreso del cliente real conserva consulta, muestra y resultado automático.");
             // Cerrar recursos mediante el mismo evento FormClosed de producción.
             typeof(Form1).GetField("_salir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(cliente, true);
             cliente.Close();
@@ -291,13 +362,14 @@ internal static class Program
     {
         public int Consultas { get; private set; }
         public Func<ResultadoAnalisis> Respuesta { get; set; } = respuesta;
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            await Task.Delay(100, ct);
             Consultas++;
             var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
             json.Converters.Add(new JsonStringEnumConverter());
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                { Content = new StringContent(JsonSerializer.Serialize(Respuesta(), json)) });
+            return new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = new StringContent(JsonSerializer.Serialize(Respuesta(), json)) };
         }
     }
 }

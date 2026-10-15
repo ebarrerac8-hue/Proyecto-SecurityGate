@@ -44,10 +44,12 @@ jobs:
         run: |
           $tokens = $null
           $errores = $null
-          [Management.Automation.Language.Parser]::ParseFile(
-            (Join-Path $PWD 'herramientas/SecureGate.Entrega/ActualizarDecisionInteractiva.ps1'),
-            [ref]$tokens, [ref]$errores) | Out-Null
-          if ($errores.Count -gt 0) { throw ($errores.Message -join "`n") }
+          foreach ($nombre in @('ActualizarDecisionInteractiva.ps1','PrepararClienteAutomatico.ps1')) {
+            [Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD ('herramientas/SecureGate.Entrega/' + $nombre)),
+              [ref]$tokens, [ref]$errores) | Out-Null
+            if ($errores.Count -gt 0) { throw ($errores.Message -join "`n") }
+          }
 
       - name: Ejecutar pruebas aisladas sin claves ni muestras reales
         env:

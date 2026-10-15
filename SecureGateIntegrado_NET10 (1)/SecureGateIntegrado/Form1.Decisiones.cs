@@ -8,6 +8,7 @@ public partial class Form1
 {
     private readonly ColaDecisionesCliente _decisiones = new();
     private bool _decisionVisible;
+    private ProgresoArchivoForm? _progresoActual;
     private bool _procesandoDecisiones;
 
     private void EncolarDecision(EnvioCliente envio)
@@ -53,6 +54,12 @@ public partial class Form1
             using var dialogo = new DecisionArchivoForm(envio.Solicitud.AnalisisLocal.Archivo.NombreOriginal,
                 tipo, () => MostrarInforme(envio), envio.Resultado?.Estado == EstadoAnalisis.Completado);
             dialogo.ShowDialog(); // Ventana independiente y central, incluso con el cliente oculto.
+            if (dialogo.Accion == AccionDecisionArchivo.Reintentar)
+            {
+                // Reanudar después de liberar el turno; conserva SolicitudId/AnalisisId.
+                BeginInvoke(new Action(async () => await ReanudarEnvioAsync(envio)));
+                return;
+            }
             await AplicarDecisionConTurnoAsync(envio, dialogo.Accion);
         }
         catch (OperationCanceledException) when (_salida.IsCancellationRequested) { }
@@ -143,7 +150,7 @@ public partial class Form1
                     "\nUbicación: " + registro.RutaOriginal, "SecureGate", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
-        else MessageBox.Show("Archivo restaurado.\nUbicación: " + registro.RutaOriginal + "\nNo se ha ejecutado.", "SecureGate");
+        else MessageBox.Show("Archivo movido a su carpeta de descarga.\nUbicación: " + registro.RutaOriginal + "\nNo se ha ejecutado.", "SecureGate");
     }
 
     private async Task GuardarDecisionAsync(EnvioCliente envio, string decision)
