@@ -168,3 +168,16 @@ No ejecutar la muestra en el anfitrion.
 
 Esta prueba demuestra conectividad y procesamiento remoto reales.
 No constituye un despliegue permanente ni completa los analisis pendientes.
+
+
+## Cliente listo para los participantes de la prueba
+
+El responsable del servidor ejecuta `ActualizarDecisionInteractiva.ps1 -Proyecto <repositorio> -Entrega <entrega> -SoloCliente -ServidorPublico <URL HTTPS actual>` con servidor y túnel activos. El actualizador conserva un respaldo y llama a `PrepararClienteAutomatico.ps1`, que verifica el acceso y crea `SecureGate_Cliente_Listo_<fecha>.zip`.
+
+Ese ZIP contiene únicamente el cliente publicado y su conexión privada. Incluye la credencial compartida de cliente; se distribuye por privado a participantes autorizados, nunca se sube a Git ni se publica como artefacto de CI. No contiene claves de VirusTotal o Gemini. La conexión privada se genera en la computadora del servidor y está excluida de Git. Si cambia la URL o se rota la clave, el responsable debe generar y distribuir otro paquete.
+
+El receptor extrae toda la carpeta y abre `SecureGateIntegrado.exe`, sin comandos, tokens ni configuración. El programa detecta Descargas mediante la carpeta conocida de Windows, activa la retención y comprueba el acceso. Si no puede conectar, muestra Reintentar/Cancelar y no inicia el monitor. Si conecta, queda junto al reloj; Salir termina el programa y la X solo oculta la interfaz.
+
+Cada nueva muestra retenida abre un cuadro pequeño no modal con progreso. Minimizar o cerrar ese cuadro no cancela el análisis. Al terminar aparece el resultado: sin detecciones ofrece **Mover a Descargas** y **Abrir**; con riesgo ofrece **Eliminar**, **Mantener bloqueado** y, cuando corresponde, **Permitir de todos modos**, con segunda confirmación. Cerrar un resultado no devuelve ni ejecuta nada. Los fallos de envío o consulta permiten reintentar conservando los identificadores. El sistema no se inicia por el mero hecho de descargar el ZIP: el cliente debe abrirse una vez y permanecer activo.
+
+Validación pendiente en equipos reales: generar el ZIP desde la entrega actualizada, abrirlo en otro equipo sin configuración manual, comprobar retención, cerrar o minimizar el progreso, recibir el resultado y verificar las acciones. Las pruebas de CI usan muestras inertes y transporte simulado; no sustituyen esa prueba remota.

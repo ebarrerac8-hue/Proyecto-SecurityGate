@@ -107,6 +107,7 @@ try {
     else { Write-Host 'Inicie manualmente servidor, túnel y cliente.' }
     if ($ServidorPublico) {
         & (Join-Path $PSScriptRoot 'PrepararClienteAutomatico.ps1') -Entrega $Entrega -ServidorPublico $ServidorPublico
+    } else {
+        Write-Host ('Paquete para compañeros: ' + (Join-Path $Entrega 'SecureGate_Cliente_Actualizado.zip'))
     }
-    Write-Host ('Paquete para compañeros: ' + (Join-Path $Entrega 'SecureGate_Cliente_Actualizado.zip'))
 } finally { Pop-Location }

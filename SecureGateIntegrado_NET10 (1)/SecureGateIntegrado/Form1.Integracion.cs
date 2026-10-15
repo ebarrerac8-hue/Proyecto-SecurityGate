@@ -498,10 +498,11 @@ public partial class Form1
             await _envios.GuardarAsync(envio, ct);
         }
 
+        var ventanaProgreso = _progresoActual;
         var progreso = new Progress<ResultadoAnalisis>(resultado =>
         {
             if (_cerrado) return;
-            _progresoActual?.Actualizar(EstadoAmigable(resultado.Estado));
+            ventanaProgreso?.Actualizar(EstadoAmigable(resultado.Estado));
             envio.EstadoLocal = EstadoAmigable(resultado.Estado);
             ActualizarFila(envio);
             if (_actual?.Solicitud.SolicitudId == envio.Solicitud.SolicitudId)

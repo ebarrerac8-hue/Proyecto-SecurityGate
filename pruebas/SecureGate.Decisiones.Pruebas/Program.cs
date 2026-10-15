@@ -344,7 +344,9 @@ internal static class Program
             limite = DateTime.UtcNow.AddSeconds(15);
             while (DateTime.UtcNow < limite && (!tarea.IsCompleted || !resultadoVisto))
             { Application.DoEvents(); Thread.Sleep(10); }
-            relojProgreso.Stop(); tarea.GetAwaiter().GetResult();
+            relojProgreso.Stop();
+            Exigir(tarea.IsCompleted, "consulta del cliente termina dentro del tiempo de prueba.");
+            tarea.GetAwaiter().GetResult();
             Exigir(progresoCerrado && resultadoVisto && envioProgreso.Terminado && File.Exists(envioProgreso.RutaArchivo),
                 "cerrar progreso del cliente real conserva consulta, muestra y resultado automático.");
             // Cerrar recursos mediante el mismo evento FormClosed de producción.
