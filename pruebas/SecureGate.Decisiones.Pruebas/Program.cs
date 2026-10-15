@@ -20,6 +20,7 @@ internal static class Program
         ProbarProgreso();
         ProbarDialogos();
         ProbarClienteOculto();
+        ProbarClienteProgreso();
         Console.WriteLine("Pruebas de decisión y diálogos aprobadas; sin claves, malware ni apertura real de ejecutables.");
     }
 
@@ -322,43 +323,66 @@ internal static class Program
             var recuperados = Task.Run(() => new AlmacenEnviosCliente(Path.Combine(raiz, "Envios")).ListarAsync()).GetAwaiter().GetResult();
             Exigir(recuperados.Count == 2 && recuperados.All(e => !e.DecisionUsuarioPendiente && e.DecisionUsuario == "MantenerRetenido") &&
                 envios.All(e => File.Exists(e.RutaArchivo)), "decisiones del cliente real persisten y conservan ambas muestras.");
-            using var vigilante = new System.Threading.Timer(_ =>
-            {
-                Console.WriteLine("TIEMPO QA: " + envios[0].EstadoLocal + "; " + envios[0].UltimoError);
-                Environment.FailFast("La prueba del progreso no terminó. No se aprueba el cambio.");
-            }, null, TimeSpan.FromSeconds(30), Timeout.InfiniteTimeSpan);
-            Console.WriteLine("QA: preparando consulta del cliente real.");
-            // Reanudar un envío real usando transporte simulado: cerrar progreso no corta su tarea.
-            var envioProgreso = envios[0];
-            envioProgreso.DecisionUsuarioPendiente = true;
-            envioProgreso.Resultado = null;
+            // Cerrar recursos mediante el mismo evento FormClosed de producción.
+            typeof(Form1).GetField("_salir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(cliente, true);
+            cliente.Close();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR", anterior);
+            if (Directory.Exists(raiz)) Directory.Delete(raiz, true);
+        }
+    }
+
+    private static void ProbarClienteProgreso()
+    {
+        string raiz = Path.Combine(Path.GetTempPath(), "SecureGateProgreso_" + Guid.NewGuid().ToString("N"));
+        string? anterior = Environment.GetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR");
+        Environment.SetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR", raiz);
+        Directory.CreateDirectory(raiz);
+        try
+        {
+            string ruta = Path.Combine(raiz, "Progreso.exe");
+            File.WriteAllText(ruta, "Muestra inerte; sin ejecucion real.");
+            var retencion = Task.Run(() => new GestorCuarentena(Path.Combine(raiz, "Cuarentena")).RetenerAsync(ruta)).GetAwaiter().GetResult();
+            var id = Guid.NewGuid();
+            var informe = Informe(retencion.Archivo!, id);
+            var envio = new EnvioCliente { Solicitud = new() { SolicitudId = Guid.NewGuid(), AnalisisLocal = informe.AnalisisLocal! },
+                RutaArchivo = Path.Combine(raiz, "Cuarentena", retencion.ArchivoId + ".bytes"),
+                Servidor = "https://pruebas.invalid/", AnalisisId = id, DecisionUsuarioPendiente = true };
+            var almacen = new AlmacenEnviosCliente(Path.Combine(raiz, "Envios"));
+            Task.Run(() => almacen.GuardarAsync(envio)).GetAwaiter().GetResult();
+            // Arranque real, pero monitor aislado y comprobaciones locales ya simuladas en el envio.
+            File.WriteAllText(Path.Combine(raiz, "configuracion.json"), JsonSerializer.Serialize(new
+                { Servidor = envio.Servidor, CarpetaMonitoreo = raiz, RetencionAutomatica = false }));
+            using var cliente = new Form1();
             var clientes = (Dictionary<string, ClienteAnalisisHttp>)typeof(Form1).GetField("_clientes",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(cliente)!;
-            using var transporte = new HttpClient(new ServidorSimulado(() => Informe(envioProgreso.Solicitud.AnalisisLocal.Archivo, envioProgreso.AnalisisId!.Value)));
-            clientes.Add("https://pruebas.invalid/", new ClienteAnalisisHttp(transporte, new Uri("https://pruebas.invalid/"), Convert.ToBase64String(new byte[32])));
-            var reanudar = typeof(Form1).GetMethod("ReanudarEnvioAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            using var transporte = new HttpClient(new ServidorSimulado(() => informe));
+            clientes.Add(envio.Servidor, new ClienteAnalisisHttp(transporte, new Uri(envio.Servidor), Convert.ToBase64String(new byte[32])));
+            using var contexto = new ApplicationContext();
             bool progresoCerrado = false, resultadoVisto = false;
-            using var relojProgreso = new System.Windows.Forms.Timer { Interval = 20 };
-            relojProgreso.Tick += (_, _) =>
+            var limite = DateTime.UtcNow.AddSeconds(20);
+            using var reloj = new System.Windows.Forms.Timer { Interval = 20 };
+            reloj.Tick += (_, _) =>
             {
                 var progreso = Application.OpenForms.OfType<ProgresoArchivoForm>().FirstOrDefault();
-                if (progreso is not null) { Console.WriteLine("QA: cerrando progreso."); progreso.Close(); progresoCerrado = true; }
+                if (progreso is not null) { Capturar(progreso, "ProgresoClienteReal"); progreso.Close(); progresoCerrado = true; }
                 var resultado = Application.OpenForms.OfType<DecisionArchivoForm>().FirstOrDefault();
-                if (resultado is not null) { resultadoVisto = true; resultado.Close(); }
+                if (resultado is not null) { Capturar(resultado, "ResultadoTrasCerrarProgreso"); resultadoVisto = true; resultado.Close(); }
+                bool decisionVisible = (bool)typeof(Form1).GetField("_decisionVisible", System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance)!.GetValue(cliente)!;
+                if ((resultadoVisto && !decisionVisible) || DateTime.UtcNow >= limite) contexto.ExitThread();
             };
-            relojProgreso.Start();
-            Console.WriteLine("QA: iniciando consulta.");
-            var tarea = (Task)reanudar.Invoke(cliente, new object[] { envioProgreso })!;
-            Console.WriteLine("QA: esperando consulta.");
-            limite = DateTime.UtcNow.AddSeconds(15);
-            while (DateTime.UtcNow < limite && (!tarea.IsCompleted || !resultadoVisto))
-            { Application.DoEvents(); Thread.Sleep(10); }
-            relojProgreso.Stop();
-            Exigir(tarea.IsCompleted, "consulta del cliente termina dentro del tiempo de prueba.");
-            tarea.GetAwaiter().GetResult();
-            Exigir(progresoCerrado && resultadoVisto && envioProgreso.Terminado && File.Exists(envioProgreso.RutaArchivo),
-                "cerrar progreso del cliente real conserva consulta, muestra y resultado automático.");
-            // Cerrar recursos mediante el mismo evento FormClosed de producción.
+            cliente.Shown += (_, _) => cliente.Hide();
+            _ = cliente.Handle;
+            cliente.BeginInvoke(new Action(() => cliente.Show()));
+            reloj.Start();
+            Application.Run(contexto);
+            reloj.Stop();
+            var guardado = Task.Run(() => almacen.ListarAsync()).GetAwaiter().GetResult().Single();
+            Exigir(progresoCerrado && resultadoVisto && guardado.Terminado && !guardado.DecisionUsuarioPendiente &&
+                File.Exists(envio.RutaArchivo), "cliente real continúa tras cerrar progreso y muestra el resultado sin ejecutar ni liberar.");
             typeof(Form1).GetField("_salir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(cliente, true);
             cliente.Close();
         }
