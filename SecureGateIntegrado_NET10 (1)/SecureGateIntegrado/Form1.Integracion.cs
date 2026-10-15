@@ -616,21 +616,8 @@ public partial class Form1
 
     private void MostrarInforme(EnvioCliente envio)
     {
-        using var fuente = new Font("Consolas", 10);
-        using var ventana = new Form
-        {
-            Text = "Informe de SecureGate", Size = new Size(850, 650),
-            StartPosition = FormStartPosition.CenterParent
-        };
-        var texto = new TextBox
-        {
-            Multiline = true, ReadOnly = true, Dock = DockStyle.Fill,
-            ScrollBars = ScrollBars.Both, WordWrap = false,
-            Font = fuente, Text = CrearInforme(envio)
-        };
-        ventana.Controls.Add(texto);
+        using var ventana = new InformeVisualForm(envio);
         ventana.TopMost = _decisionVisible;
-        ventana.StartPosition = FormStartPosition.CenterScreen;
         ventana.ShowDialog();
     }
 
