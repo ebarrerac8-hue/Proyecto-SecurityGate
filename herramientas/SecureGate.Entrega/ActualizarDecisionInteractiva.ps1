@@ -1,7 +1,8 @@
 param(
     [string]$Proyecto = (Get-Location).Path,
     [Parameter(Mandatory=$true)][string]$Entrega,
-    [switch]$SoloCliente
+    [switch]$SoloCliente,
+    [string]$ServidorPublico
 )
 $ErrorActionPreference = 'Stop'
 $Proyecto = (Resolve-Path -LiteralPath $Proyecto).Path
@@ -104,5 +105,9 @@ try {
     Write-Host "Respaldo: $respaldo"
     if ($SoloCliente) { Write-Host 'Abra el cliente con su acceso habitual. Puede revisar el informe guardado sin repetir el análisis.' }
     else { Write-Host 'Inicie manualmente servidor, túnel y cliente.' }
-    Write-Host ('Paquete para compañeros: ' + (Join-Path $Entrega 'SecureGate_Cliente_Actualizado.zip'))
+    if ($ServidorPublico) {
+        & (Join-Path $PSScriptRoot 'PrepararClienteAutomatico.ps1') -Entrega $Entrega -ServidorPublico $ServidorPublico
+    } else {
+        Write-Host ('Paquete para compañeros: ' + (Join-Path $Entrega 'SecureGate_Cliente_Actualizado.zip'))
+    }
 } finally { Pop-Location }

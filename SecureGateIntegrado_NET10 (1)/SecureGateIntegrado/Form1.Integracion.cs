@@ -20,7 +20,7 @@ public partial class Form1
     private readonly Dictionary<string, ClienteAnalisisHttp> _clientes = new();
     private readonly HistorialPersistencia _historialPersistencia = new(EntornoCliente.CarpetaHistorial);
     private PreparadorEnviosProtegidos? _preparadorProteccion;
-    private bool _retencionAutomatica;
+    private bool _retencionAutomatica = true;
     private CancellationTokenSource? _operacion;
     private EnvioCliente? _actual;
     private NotifyIcon? _bandeja;
@@ -213,6 +213,19 @@ public partial class Form1
                 }
             }
 
+            if (PaqueteCliente.Cargar() is { } paquete)
+            {
+                _servidor = NormalizarServidor(paquete.Servidor);
+                _carpetaMonitoreo = DownloadMonitor.ObtenerDescargas();
+                _retencionAutomatica = true;
+                while (!await paquete.VerificarConexionAsync(_salida.Token))
+                {
+                    if (MessageBox.Show("No se puede conectar con SecureGate.\nEl monitoreo todavía no se ha iniciado.",
+                        "SecureGate", MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning) != DialogResult.Retry) return;
+                }
+                Hide();
+            }
+
             foreach (var envio in (await _envios.ListarAsync(_salida.Token)).Reverse())
             {
                 await SincronizarEstadoArchivoAsync(envio, _salida.Token);
@@ -246,6 +259,7 @@ public partial class Form1
     {
         bool adquirido = false;
         EnvioCliente? envio = null;
+        ProgresoArchivoForm? progresoArchivo = null;
         try
         {
             if (!_historialDisponible)
@@ -257,12 +271,16 @@ public partial class Form1
             {
                 EntornoCliente.ValidarRutaPrueba(ruta);
                 retencion = await _preparadorProteccion!.RetenerRutaAsync(ruta, _salida.Token);
+                progresoArchivo = new ProgresoArchivoForm(retencion.Archivo?.NombreOriginal ?? Path.GetFileName(ruta));
+                progresoArchivo.Show();
                 if (automatico) Notificar("Archivo retenido para analizar: " + retencion.Archivo?.NombreOriginal);
             }
             await _cola.WaitAsync(_salida.Token);
             adquirido = true;
             if (_cerrado) return;
             PrepararEspera();
+            _progresoActual = progresoArchivo;
+            progresoArchivo?.Actualizar("Comprobando firma y antivirus…");
             _actual = null;
             btnConfigureSandbox.Enabled = false;
             lblSandboxTitle.Text = "Preparando análisis";
@@ -368,8 +386,11 @@ public partial class Form1
         }
         finally
         {
+            progresoArchivo?.Close();
+            progresoArchivo?.Dispose();
             if (adquirido)
             {
+                _progresoActual = null;
                 TerminarEspera();
                 _cola.Release();
                 if (envio is not null) EncolarDecision(envio);
@@ -419,11 +440,19 @@ public partial class Form1
     private async Task ReanudarEnvioAsync(EnvioCliente envio)
     {
         bool adquirido = false;
+        ProgresoArchivoForm? progreso = null;
         try
         {
             await _cola.WaitAsync(_salida.Token);
             adquirido = true;
             if (_cerrado) return;
+            envio.DecisionUsuarioPendiente = true;
+            if (EsMuestraRetenida(envio))
+            {
+                progreso = new ProgresoArchivoForm(envio.Solicitud.AnalisisLocal.Archivo.NombreOriginal);
+                progreso.Show();
+            }
+            _progresoActual = progreso;
             PrepararEspera();
             _actual = envio;
             MostrarRegistro(envio);
@@ -433,8 +462,11 @@ public partial class Form1
         catch (Exception error) { await RegistrarErrorAsync(envio, error); }
         finally
         {
+            progreso?.Close();
+            progreso?.Dispose();
             if (adquirido)
             {
+                _progresoActual = null;
                 TerminarEspera();
                 _cola.Release();
                 EncolarDecision(envio);
@@ -455,6 +487,7 @@ public partial class Form1
 
         if (envio.AnalisisId is null)
         {
+            _progresoActual?.Actualizar("Enviando al servidor…");
             envio.EstadoLocal = "Enviando";
             envio.UltimoError = null;
             await _envios.GuardarAsync(envio, ct);
@@ -465,9 +498,11 @@ public partial class Form1
             await _envios.GuardarAsync(envio, ct);
         }
 
+        var ventanaProgreso = _progresoActual;
         var progreso = new Progress<ResultadoAnalisis>(resultado =>
         {
             if (_cerrado) return;
+            ventanaProgreso?.Actualizar(EstadoAmigable(resultado.Estado));
             envio.EstadoLocal = EstadoAmigable(resultado.Estado);
             ActualizarFila(envio);
             if (_actual?.Solicitud.SolicitudId == envio.Solicitud.SolicitudId)
@@ -940,6 +975,6 @@ public partial class Form1
     {
         public string Servidor { get; init; } = "https://localhost:5443/";
         public string? CarpetaMonitoreo { get; init; }
-        public bool RetencionAutomatica { get; init; }
+        public bool RetencionAutomatica { get; init; } = true;
     }
 }

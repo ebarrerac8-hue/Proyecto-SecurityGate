@@ -179,6 +179,7 @@ public sealed class ClienteAnalisisHttp : IClienteAnalisis, IDisposable
         limite.CancelAfter(tiempo);
         try
         {
+            peticion.Headers.TryAddWithoutValidation("ngrok-skip-browser-warning", "SecureGate");
             peticion.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
             using var respuesta = await _http.SendAsync(
                 peticion, HttpCompletionOption.ResponseHeadersRead, limite.Token);

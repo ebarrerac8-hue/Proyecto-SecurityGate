@@ -12,11 +12,15 @@ internal static class Program
     private static void Main()
     {
         PruebasAsync().GetAwaiter().GetResult();
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         Application.SetHighDpiMode(HighDpiMode.SystemAware);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        ProbarPaquete();
+        ProbarProgreso();
         ProbarDialogos();
         ProbarClienteOculto();
+        ProbarClienteProgreso();
         Console.WriteLine("Pruebas de decisión y diálogos aprobadas; sin claves, malware ni apertura real de ejecutables.");
     }
 
@@ -165,6 +169,45 @@ internal static class Program
     }
 
     private static IEnumerable<Control> Controles(Control c) => c.Controls.Cast<Control>().SelectMany(h => new[] { h }.Concat(Controles(h)));
+    private static void ProbarPaquete()
+    {
+        string ruta = Path.GetTempFileName();
+        string? anterior = Environment.GetEnvironmentVariable("SECUREGATE_CLIENT_TOKEN");
+        try
+        {
+            string clave = Convert.ToBase64String(new byte[32]); // Credencial sintética, sin acceso real.
+            File.WriteAllText(ruta, JsonSerializer.Serialize(new { Servidor = "https://pruebas.invalid/", ClaveCliente = clave }));
+            var paquete = PaqueteCliente.Cargar(ruta);
+            Exigir(paquete?.Servidor == "https://pruebas.invalid/" && Environment.GetEnvironmentVariable("SECUREGATE_CLIENT_TOKEN") == clave,
+                "paquete carga URL y acceso sin intervención ni variables previas del usuario.");
+            foreach (string servidor in new[] { "http://pruebas.invalid/", "https://localhost:5443/", "https://usuario:clave@pruebas.invalid/", "https://pruebas.invalid/?clave=1" })
+            {
+                File.WriteAllText(ruta, JsonSerializer.Serialize(new { Servidor = servidor, ClaveCliente = clave }));
+                bool rechazado = false;
+                try { PaqueteCliente.Cargar(ruta); } catch (InvalidDataException) { rechazado = true; }
+                Exigir(rechazado, "paquete rechaza URL inválida sin exponer credenciales.");
+            }
+            File.WriteAllText(ruta, JsonSerializer.Serialize(new { Servidor = "https://pruebas.invalid/", ClaveCliente = "incorrecta" }));
+            bool invalido = false;
+            try { PaqueteCliente.Cargar(ruta); } catch (InvalidDataException) { invalido = true; }
+            Exigir(invalido, "clave inválida se detecta antes de monitorear.");
+        }
+        finally { File.Delete(ruta); Environment.SetEnvironmentVariable("SECUREGATE_CLIENT_TOKEN", anterior); }
+    }
+
+    private static void ProbarProgreso()
+    {
+        using var progreso = new ProgresoArchivoForm("Descarga.exe");
+        progreso.Show(); Application.DoEvents();
+        Exigir(progreso.MinimizeBox && !Controles(progreso).OfType<Button>().Any(), "progreso pequeño con minimizar y cerrar, sin botón Ocultar.");
+        progreso.Actualizar("Consultando servidor…");
+        Capturar(progreso, "Progreso");
+        progreso.WindowState = FormWindowState.Minimized; Application.DoEvents();
+        Exigir(!progreso.Visible, "minimizar oculta progreso sin cancelar.");
+        progreso.Close(); progreso.Actualizar("Finalizado");
+        Exigir(progreso.IsDisposed, "cerrar progreso permite descartar su ventana y recibir actualizaciones tardías.");
+    }
+
     private static void ProbarDialogos()
     {
         foreach (var tipo in Enum.GetValues<TipoResultadoDecision>())
@@ -173,6 +216,10 @@ internal static class Program
             var botones = Controles(dialogo).OfType<Button>().ToList();
             Exigir(botones.Any(b => b.Name == "DevolverYAbrir") == (tipo == TipoResultadoDecision.SinAmenazasReportadas),
                 "abrir solo aparece en el resultado favorable: " + tipo);
+            if (tipo == TipoResultadoDecision.SinAmenazasReportadas)
+                Exigir(botones.Select(b => b.Text).SequenceEqual(new[] { "Abrir", "Mover a Descargas" }) ||
+                    botones.Select(b => b.Text).SequenceEqual(new[] { "Mover a Descargas", "Abrir" }),
+                    "resultado favorable tiene exactamente dos acciones claras.");
             using var reloj = new System.Windows.Forms.Timer { Interval = 50 };
             reloj.Tick += (_, _) => { reloj.Stop(); dialogo.Close(); };
             dialogo.Shown += (_, _) =>
@@ -259,7 +306,7 @@ internal static class Program
                 if (cuadro is null) return;
                 vistos.Add(Controles(cuadro).OfType<Label>().Single(l => l.Text.EndsWith(".exe")).Text);
                 Capturar(cuadro, "ClienteOculto_" + vistos.Count);
-                Controles(cuadro).OfType<Button>().Single(b => b.Name == "Mantener").PerformClick();
+                cuadro.Close(); // X conserva retención incluso sin un tercer botón en el resultado favorable.
             };
             reloj.Start();
             encolar.Invoke(cliente, new object[] { envios[0] });
@@ -287,17 +334,77 @@ internal static class Program
         }
     }
 
+    private static void ProbarClienteProgreso()
+    {
+        string raiz = Path.Combine(Path.GetTempPath(), "SecureGateProgreso_" + Guid.NewGuid().ToString("N"));
+        string? anterior = Environment.GetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR");
+        Environment.SetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR", raiz);
+        Directory.CreateDirectory(raiz);
+        try
+        {
+            string ruta = Path.Combine(raiz, "Progreso.exe");
+            File.WriteAllText(ruta, "Muestra inerte; sin ejecucion real.");
+            var retencion = Task.Run(() => new GestorCuarentena(Path.Combine(raiz, "Cuarentena")).RetenerAsync(ruta)).GetAwaiter().GetResult();
+            var id = Guid.NewGuid();
+            var informe = Informe(retencion.Archivo!, id);
+            var envio = new EnvioCliente { Solicitud = new() { SolicitudId = Guid.NewGuid(), AnalisisLocal = informe.AnalisisLocal! },
+                RutaArchivo = Path.Combine(raiz, "Cuarentena", retencion.ArchivoId + ".bytes"),
+                Servidor = "https://pruebas.invalid/", AnalisisId = id, DecisionUsuarioPendiente = true };
+            var almacen = new AlmacenEnviosCliente(Path.Combine(raiz, "Envios"));
+            Task.Run(() => almacen.GuardarAsync(envio)).GetAwaiter().GetResult();
+            // Arranque real, pero monitor aislado y comprobaciones locales ya simuladas en el envio.
+            File.WriteAllText(Path.Combine(raiz, "configuracion.json"), JsonSerializer.Serialize(new
+                { Servidor = envio.Servidor, CarpetaMonitoreo = raiz, RetencionAutomatica = false }));
+            using var cliente = new Form1();
+            var clientes = (Dictionary<string, ClienteAnalisisHttp>)typeof(Form1).GetField("_clientes",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(cliente)!;
+            using var transporte = new HttpClient(new ServidorSimulado(() => informe));
+            clientes.Add(envio.Servidor, new ClienteAnalisisHttp(transporte, new Uri(envio.Servidor), Convert.ToBase64String(new byte[32])));
+            using var contexto = new ApplicationContext();
+            bool progresoCerrado = false, resultadoVisto = false;
+            var limite = DateTime.UtcNow.AddSeconds(20);
+            using var reloj = new System.Windows.Forms.Timer { Interval = 20 };
+            reloj.Tick += (_, _) =>
+            {
+                var progreso = Application.OpenForms.OfType<ProgresoArchivoForm>().FirstOrDefault();
+                if (progreso is not null) { Capturar(progreso, "ProgresoClienteReal"); progreso.Close(); progresoCerrado = true; }
+                var resultado = Application.OpenForms.OfType<DecisionArchivoForm>().FirstOrDefault();
+                if (resultado is not null) { Capturar(resultado, "ResultadoTrasCerrarProgreso"); resultadoVisto = true; resultado.Close(); }
+                bool decisionVisible = (bool)typeof(Form1).GetField("_decisionVisible", System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance)!.GetValue(cliente)!;
+                if ((resultadoVisto && !decisionVisible) || DateTime.UtcNow >= limite) contexto.ExitThread();
+            };
+            cliente.Shown += (_, _) => cliente.Hide();
+            _ = cliente.Handle;
+            cliente.BeginInvoke(new Action(() => cliente.Show()));
+            reloj.Start();
+            Application.Run(contexto);
+            reloj.Stop();
+            var guardado = Task.Run(() => almacen.ListarAsync()).GetAwaiter().GetResult().Single();
+            Exigir(progresoCerrado && resultadoVisto && guardado.Terminado && !guardado.DecisionUsuarioPendiente &&
+                File.Exists(envio.RutaArchivo), "cliente real continúa tras cerrar progreso y muestra el resultado sin ejecutar ni liberar.");
+            typeof(Form1).GetField("_salir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(cliente, true);
+            cliente.Close();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SECUREGATE_CLIENT_DATA_DIR", anterior);
+            if (Directory.Exists(raiz)) Directory.Delete(raiz, true);
+        }
+    }
+
     private sealed class ServidorSimulado(Func<ResultadoAnalisis> respuesta) : HttpMessageHandler
     {
         public int Consultas { get; private set; }
         public Func<ResultadoAnalisis> Respuesta { get; set; } = respuesta;
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            await Task.Delay(100, ct);
             Consultas++;
             var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
             json.Converters.Add(new JsonStringEnumConverter());
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                { Content = new StringContent(JsonSerializer.Serialize(Respuesta(), json)) });
+            return new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = new StringContent(JsonSerializer.Serialize(Respuesta(), json)) };
         }
     }
 }
