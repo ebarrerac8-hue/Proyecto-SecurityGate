@@ -12,6 +12,7 @@ internal static class Program
     private static void Main()
     {
         PruebasAsync().GetAwaiter().GetResult();
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         Application.SetHighDpiMode(HighDpiMode.SystemAware);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -321,6 +322,12 @@ internal static class Program
             var recuperados = Task.Run(() => new AlmacenEnviosCliente(Path.Combine(raiz, "Envios")).ListarAsync()).GetAwaiter().GetResult();
             Exigir(recuperados.Count == 2 && recuperados.All(e => !e.DecisionUsuarioPendiente && e.DecisionUsuario == "MantenerRetenido") &&
                 envios.All(e => File.Exists(e.RutaArchivo)), "decisiones del cliente real persisten y conservan ambas muestras.");
+            using var vigilante = new System.Threading.Timer(_ =>
+            {
+                Console.WriteLine("TIEMPO QA: " + envios[0].EstadoLocal + "; " + envios[0].UltimoError);
+                Environment.FailFast("La prueba del progreso no terminó. No se aprueba el cambio.");
+            }, null, TimeSpan.FromSeconds(30), Timeout.InfiniteTimeSpan);
+            Console.WriteLine("QA: preparando consulta del cliente real.");
             // Reanudar un envío real usando transporte simulado: cerrar progreso no corta su tarea.
             var envioProgreso = envios[0];
             envioProgreso.DecisionUsuarioPendiente = true;
@@ -335,12 +342,14 @@ internal static class Program
             relojProgreso.Tick += (_, _) =>
             {
                 var progreso = Application.OpenForms.OfType<ProgresoArchivoForm>().FirstOrDefault();
-                if (progreso is not null) { progreso.Close(); progresoCerrado = true; }
+                if (progreso is not null) { Console.WriteLine("QA: cerrando progreso."); progreso.Close(); progresoCerrado = true; }
                 var resultado = Application.OpenForms.OfType<DecisionArchivoForm>().FirstOrDefault();
                 if (resultado is not null) { resultadoVisto = true; resultado.Close(); }
             };
             relojProgreso.Start();
+            Console.WriteLine("QA: iniciando consulta.");
             var tarea = (Task)reanudar.Invoke(cliente, new object[] { envioProgreso })!;
+            Console.WriteLine("QA: esperando consulta.");
             limite = DateTime.UtcNow.AddSeconds(15);
             while (DateTime.UtcNow < limite && (!tarea.IsCompleted || !resultadoVisto))
             { Application.DoEvents(); Thread.Sleep(10); }
