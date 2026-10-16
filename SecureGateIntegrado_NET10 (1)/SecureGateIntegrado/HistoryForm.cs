@@ -352,15 +352,72 @@ public class HistoryForm : Form
     private void MostrarDetalles()
     {
         if (_grid.SelectedRows.Count == 0 || _grid.SelectedRows[0].Tag is not ListViewItem item) return;
-        string texto = item.Tag is EnvioCliente envio
-            ? "Ubicación de la muestra: " + envio.RutaArchivo + "\n\n" + Form1.CrearInforme(envio)
-            : string.Join(Environment.NewLine, item.SubItems.Cast<ListViewItem.ListViewSubItem>().Select(s => s.Text));
-        using var ventana = new Form { Text = "Detalles del archivo — SecureGate", Font = Font,
-            StartPosition = FormStartPosition.CenterParent, Size = new Size(850, 620), MinimumSize = new Size(600, 400) };
-        var contenido = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true,
-            ScrollBars = ScrollBars.Both, WordWrap = false, Text = texto, Font = new Font("Consolas", 10F) };
-        ventana.Controls.Add(contenido);
-        ventana.ShowDialog(this);
+
+        // Si el item tiene un EnvioCliente completo, usar el nuevo formulario visual
+        if (item.Tag is EnvioCliente envio)
+        {
+            using var ventana = new InformeVisualForm(envio);
+            ventana.ShowDialog(this);
+            return;
+        }
+
+        // Fallback para items sin EnvioCliente: mostrar datos básicos con estilo
+        string texto = string.Join(Environment.NewLine,
+            item.SubItems.Cast<ListViewItem.ListViewSubItem>().Select(s => s.Text));
+
+        using var fallback = new Form
+        {
+            Text = "Detalles del archivo — SecureGate",
+            Font = new Font("Segoe UI", 10F),
+            StartPosition = FormStartPosition.CenterParent,
+            Size = new Size(640, 420),
+            MinimumSize = new Size(500, 320),
+            BackColor = Color.FromArgb(245, 247, 250)
+        };
+
+        // Header azul
+        var header = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(37, 99, 235) };
+        var lblTit = new Label
+        {
+            Text = "Detalles del archivo",
+            Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+            ForeColor = Color.White, Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(16, 0, 0, 0)
+        };
+        header.Controls.Add(lblTit);
+        fallback.Controls.Add(header);
+
+        // Área de texto con fondo blanco y borde
+        var contenido = new TextBox
+        {
+            Dock = DockStyle.Fill, Multiline = true, ReadOnly = true,
+            ScrollBars = ScrollBars.Vertical, WordWrap = true,
+            Text = texto, Font = new Font("Segoe UI", 10F),
+            BackColor = Color.White, BorderStyle = BorderStyle.None,
+            Padding = new Padding(12)
+        };
+
+        // Footer con botón Cerrar
+        var footer = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = Color.FromArgb(245, 247, 250) };
+        var btnCerrar = new Button
+        {
+            Text = "Cerrar", Height = 34, Width = 100,
+            BackColor = Color.FromArgb(229, 231, 235),
+            ForeColor = Color.FromArgb(17, 24, 39),
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9.5F),
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        btnCerrar.FlatAppearance.BorderSize = 0;
+        btnCerrar.Click += (_, _) => fallback.Close();
+        footer.Resize += (_, _) => btnCerrar.Location = new Point(footer.Width - 116, 7);
+        btnCerrar.Location = new Point(508, 7);
+        footer.Controls.Add(btnCerrar);
+
+        fallback.Controls.Add(contenido);
+        fallback.Controls.Add(footer);
+        fallback.ShowDialog(this);
     }
     protected override void Dispose(bool disposing)
     {
