@@ -128,6 +128,7 @@ internal sealed class InformeVisualForm : Form
             Padding    = new Padding(14, 12, 14, 12)
         };
         Controls.Add(_scrollArea);
+        _scrollArea.BringToFront(); // Dock.Fill ocupa solo el espacio restante entre encabezado y acciones.
     }
 
     // ────────────────────────────────────────────────────
@@ -275,7 +276,12 @@ internal sealed class InformeVisualForm : Form
         _scrollArea.Resize += (_, _) =>
         {
             int w = _scrollArea.ClientSize.Width - pad * 2;
-            foreach (Control c in _scrollArea.Controls) { c.Left = pad; c.Width = w; }
+            int top = _scrollArea.Padding.Top + _scrollArea.AutoScrollPosition.Y;
+            foreach (Control c in _scrollArea.Controls)
+            {
+                c.Left = pad; c.Width = w; c.Top = top;
+                top += c.Height + 10;
+            }
         };
     }
 
@@ -433,7 +439,13 @@ internal sealed class InformeVisualForm : Form
             Location    = new Point(10, 8)
         };
         p.Controls.Add(lbl);
-        p.Height = lbl.Bottom + 10;
+        void Ajustar()
+        {
+            lbl.MaximumSize = new Size(Math.Max(80, p.ClientSize.Width - 24), 0);
+            p.Height = lbl.Bottom + 10;
+        }
+        p.Resize += (_, _) => Ajustar();
+        Ajustar();
         return p;
     }
 

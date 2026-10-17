@@ -278,6 +278,10 @@ internal static class Program
             var botones = Controles(ventana).OfType<Button>().Where(b=>b.Name is "CerrarInforme" or "ExportarInforme").ToArray();
             Exigir(botones.Length==2 && botones.All(b=>b.Parent!.ClientRectangle.Contains(b.Bounds)) &&
                 !botones[0].Bounds.IntersectsWith(botones[1].Bounds), "informe conserva botones completos sin solapamiento a " + ancho);
+            var scroll = ventana.Controls.OfType<Panel>().Single(p=>p.AutoScroll);
+            Exigir(botones.All(b=>ventana.ClientRectangle.Contains(ventana.RectangleToClient(b.RectangleToScreen(b.ClientRectangle))) &&
+                !scroll.RectangleToScreen(scroll.ClientRectangle).IntersectsWith(b.RectangleToScreen(b.ClientRectangle))),
+                "acciones del informe visibles fuera del area de desplazamiento a " + ancho);
             Capturar(ventana,"InformeBloqueado_"+ancho); ventana.Close();
         }
     }
