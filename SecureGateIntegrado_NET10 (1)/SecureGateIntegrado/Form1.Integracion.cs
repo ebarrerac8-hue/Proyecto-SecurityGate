@@ -715,6 +715,8 @@ public partial class Form1
         texto.AppendLine("Resultado visible: " + PresentacionAnalisis.Resultado(envio));
         texto.AppendLine("Alcance: " + PresentacionAnalisis.Alcance(envio));
         texto.AppendLine("Evaluación técnica original: " + resultado.Evaluacion);
+        if (envio.Resultado?.Sandbox?.DemostracionComportamiento == true)
+            texto.AppendLine("DEMOSTRACIÓN CONTROLADA: cmd.exe de Windows con acciones benignas predeterminadas. No es malware ni un instalador.");
         foreach (var hallazgo in AnalizadorComportamientoSandbox.Analizar(resultado))
             texto.AppendLine("COMPORTAMIENTO SANDBOX [" + hallazgo.Codigo + "]: " + hallazgo.Descripcion +
                 " Eventos: " + string.Join(", ", hallazgo.Eventos));

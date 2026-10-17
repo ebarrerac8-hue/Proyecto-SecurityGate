@@ -111,6 +111,7 @@ public sealed class ProcesadorAnalisis : BackgroundService
                                         Sha256 = resultado.Archivo.Sha256,
                                         RutaMuestraServidor = trabajo.RutaMuestraServidor,
                                         ExtensionMuestra = resultado.Archivo.Extension,
+                                        DemostracionComportamiento = _opciones.DemostracionComportamiento,
                                         TiempoObservacionSegundos = _opciones.TiempoObservacionSegundos
                                     }, stoppingToken);
 

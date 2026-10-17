@@ -89,6 +89,7 @@ jobs:
         shell: pwsh
         run: |
           & ./herramientas/SecureGate.Comportamiento/ProbarObservadorWindows.ps1
+          & ./herramientas/SecureGate.Comportamiento/ProbarObservadorWindows.ps1 -DemoFirmada
 
       - name: Guardar capturas de los cuadros de decision
         if: always()

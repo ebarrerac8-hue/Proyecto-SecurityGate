@@ -30,12 +30,15 @@ public static class PreparadorEvidenciasIa
         Agregar("Reputacion", rep is null ? "No se consultó reputación." :
             $"Estado: {rep.Estado}; informe encontrado: {rep.InformeEncontrado}; " +
             $"motores maliciosos: {rep.MotoresMaliciosos}; sospechosos: {rep.MotoresSospechosos}; " +
-            $"sin detección: {rep.MotoresSinDeteccion}.");
+            $"sin detección: {rep.MotoresSinDeteccion}. " +
+            "Informe encontrado=False significa sin información, no un análisis limpio.");
         var sandbox = resultado.Sandbox;
         Agregar("Sandbox", sandbox is null ? "No se realizó prueba Sandbox." :
             $"Estado: {sandbox.Estado}; muestra ejecutada: {sandbox.MuestraEjecutada}; " +
             $"observador iniciado: {sandbox.ObservadorIniciado}; red: {sandbox.RedHabilitada}; " +
             $"inicio: {sandbox.InicioUtc:o}; fin: {sandbox.FinUtc:o}; eventos: {sandbox.Eventos.Count}.");
+        if (sandbox?.DemostracionComportamiento == true)
+            Agregar("Demostracion", "Laboratorio explícito: cmd.exe de Windows con acciones benignas predeterminadas. No es malware ni un instalador; no generalizar esta demostración a otros archivos.");
         Agregar("Cobertura", "Comprobaciones locales y reputación: " +
             $"firma={local?.FirmaDigital.Estado}; antivirus={local?.Antivirus.Estado}; reputación={rep?.Estado}. " +
             "Incompleto no implica que falten comprobaciones: puede expresar límites de la observación. No inventar capas faltantes.");
