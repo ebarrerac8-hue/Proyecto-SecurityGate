@@ -316,7 +316,10 @@ internal static class Program
                 var informe = Informe(retencion.Archivo!, id);
                 envios.Add(new EnvioCliente { Solicitud = new() { SolicitudId = Guid.NewGuid(), AnalisisLocal = informe.AnalisisLocal! },
                     RutaArchivo = Path.Combine(raiz, "Cuarentena", retencion.ArchivoId + ".bytes"),
-                    Servidor = "https://pruebas.invalid/", AnalisisId = id, Resultado = informe, DecisionUsuarioPendiente = true });
+                    Servidor = "https://pruebas.invalid/", AnalisisId = nombre == "Segundo.exe" ? null : id,
+                    Resultado = nombre == "Segundo.exe" ? null : informe, DecisionUsuarioPendiente = true,
+                    EstadoLocal = nombre == "Segundo.exe" ? "Pendiente de revisión" : "Procesamiento terminado",
+                    UltimoError = nombre == "Segundo.exe" ? "No se pudo conectar con el servidor de SecureGate." : null });
             }
             using var cliente = new Form1();
             _ = cliente.Handle; // Crear el hilo/handle sin disparar Shown ni iniciar servicios reales.
@@ -349,6 +352,18 @@ internal static class Program
             var recuperados = Task.Run(() => new AlmacenEnviosCliente(Path.Combine(raiz, "Envios")).ListarAsync()).GetAwaiter().GetResult();
             Exigir(recuperados.Count == 2 && recuperados.All(e => !e.DecisionUsuarioPendiente && e.DecisionUsuario == "MantenerRetenido") &&
                 envios.All(e => File.Exists(e.RutaArchivo)), "decisiones del cliente real persisten y conservan ambas muestras.");
+            Exigir(recuperados.Single(e=>e.Solicitud.SolicitudId==envios[1].Solicitud.SolicitudId).UltimoError ==
+                "No se pudo conectar con el servidor de SecureGate.",
+                "cerrar con X conserva el error de conexion junto con la decision y la muestra retenida.");
+            Exigir(Form1.CrearInforme(envios[1]).Contains("No se pudo conectar con el servidor de SecureGate."),
+                "informe exportado conserva el diagnostico de la muestra retenida.");
+            using (var informeError = new InformeVisualForm(envios[1]))
+            {
+                informeError.Show(); Application.DoEvents();
+                Exigir(Controles(informeError).OfType<Label>().Any(l=>l.Text.Contains("No se pudo conectar con el servidor de SecureGate.")),
+                    "informe visual muestra el fallo del ultimo intento.");
+                Capturar(informeError,"InformeErrorConexion"); informeError.Close();
+            }
             // Cerrar recursos mediante el mismo evento FormClosed de producción.
             typeof(Form1).GetField("_salir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(cliente, true);
             cliente.Close();
@@ -375,7 +390,8 @@ internal static class Program
             var informe = Informe(retencion.Archivo!, id);
             var envio = new EnvioCliente { Solicitud = new() { SolicitudId = Guid.NewGuid(), AnalisisLocal = informe.AnalisisLocal! },
                 RutaArchivo = Path.Combine(raiz, "Cuarentena", retencion.ArchivoId + ".bytes"),
-                Servidor = "https://pruebas.invalid/", AnalisisId = id, DecisionUsuarioPendiente = true };
+                Servidor = "https://pruebas.invalid/", AnalisisId = id, DecisionUsuarioPendiente = true,
+                UltimoError = "Error anterior que debe desaparecer tras completar el reintento." };
             var almacen = new AlmacenEnviosCliente(Path.Combine(raiz, "Envios"));
             Task.Run(() => almacen.GuardarAsync(envio)).GetAwaiter().GetResult();
             // Arranque real, pero monitor aislado y comprobaciones locales ya simuladas en el envio.
@@ -408,7 +424,7 @@ internal static class Program
             reloj.Stop();
             var guardado = Task.Run(() => almacen.ListarAsync()).GetAwaiter().GetResult().Single();
             Exigir(progresoCerrado && resultadoVisto && guardado.Terminado && !guardado.DecisionUsuarioPendiente &&
-                File.Exists(envio.RutaArchivo), "cliente real continúa tras cerrar progreso y muestra el resultado sin ejecutar ni liberar.");
+                File.Exists(envio.RutaArchivo) && guardado.UltimoError is null, "cliente real continúa tras cerrar progreso y muestra el resultado sin ejecutar ni liberar.");
             typeof(Form1).GetField("_salir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(cliente, true);
             cliente.Close();
         }

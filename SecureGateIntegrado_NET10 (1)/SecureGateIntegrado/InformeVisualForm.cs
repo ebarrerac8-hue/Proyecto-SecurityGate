@@ -156,6 +156,8 @@ internal sealed class InformeVisualForm : Form
         var estTexto = res is null ? "⏳  Esperando resultado del servidor"
             : LabelEstado(res.Estado);
         items.Add(StatusBadge(estTexto, estColor));
+        if (!string.IsNullOrWhiteSpace(_envio.UltimoError))
+            items.Add(Quote("Último intento: " + _envio.UltimoError, Rojo, RojoFondo));
         if (res?.Sandbox?.DemostracionComportamiento == true)
             items.Add(Quote("Demostración controlada con cmd.exe de Windows y acciones benignas predeterminadas. No es una muestra de malware ni el análisis de un instalador.", Azul, AzulClaro));
         if (res?.CodigoError == "SANDBOX_EJECUCION_BLOQUEADA")

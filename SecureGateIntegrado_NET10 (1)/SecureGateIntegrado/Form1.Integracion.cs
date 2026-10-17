@@ -489,7 +489,6 @@ public partial class Form1
         {
             _progresoActual?.Actualizar("Enviando al servidor…");
             envio.EstadoLocal = "Enviando";
-            envio.UltimoError = null;
             await _envios.GuardarAsync(envio, ct);
             ActualizarFila(envio);
             var aceptado = await cliente.EnviarArchivoAsync(envio.Solicitud, envio.RutaArchivo, ct);
@@ -628,7 +627,8 @@ public partial class Form1
             "Consulta de reputación a cargo del servidor.";
         lblSandboxTitle.Text = PresentacionAnalisis.Procesamiento(envio);
         lblSandboxStatus.Text = "Resultado: " + PresentacionAnalisis.Resultado(envio) + "\n\n" +
-            PresentacionAnalisis.Informe(envio) + "\n\n" + PresentacionAnalisis.Alcance(envio);
+            PresentacionAnalisis.Informe(envio) + "\n\n" + PresentacionAnalisis.Alcance(envio) +
+            (string.IsNullOrWhiteSpace(envio.UltimoError) ? "" : "\n\nÚltimo intento: " + envio.UltimoError);
         btnConfigureSandbox.Enabled = true;
 
         // Habilitar/deshabilitar botones según estado

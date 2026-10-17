@@ -1,7 +1,15 @@
-param([Parameter(Mandatory=$true)][string]$Entrega)
+param([Parameter(Mandatory=$true)][string]$Entrega, [switch]$PrepararSolo)
 $ErrorActionPreference = 'Stop'
+$Entrega = (Resolve-Path -LiteralPath $Entrega).Path
+$exe = Join-Path $Entrega 'Servidor\SecureGate.Servidor.exe'
+if (!(Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'No se encontro el servidor publicado en la entrega.' }
 $script = Join-Path $Entrega 'Servidor\IniciarServidorPublicado.ps1'
-if (!(Test-Path -LiteralPath $script)) { throw 'No se encontro el lanzador del servidor publicado.' }
+if (!(Test-Path -LiteralPath $script)) {
+    $plantilla = Join-Path $PSScriptRoot '..\SecureGate.Entrega\Plantillas\IniciarServidorPublicado.ps1'
+    if (!(Test-Path -LiteralPath $plantilla -PathType Leaf)) { throw 'Falta la plantilla del lanzador; actualice el repositorio.' }
+    Copy-Item -LiteralPath $plantilla -Destination $script -ErrorAction Stop
+}
+if ($PrepararSolo) { Write-Output $script; return }
 if (Get-Process -Name 'SecureGate.Servidor' -ErrorAction SilentlyContinue) { throw 'Cierre el servidor anterior antes de iniciar el laboratorio.' }
 $anterior = $env:Servidor__DemostracionComportamiento
 try {
