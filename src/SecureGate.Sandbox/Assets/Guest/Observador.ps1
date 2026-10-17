@@ -1,4 +1,9 @@
-﻿$ErrorActionPreference = "Stop"
+﻿param([switch]$PruebaObservador)
+# Solo CI efimero puede omitir el apagado del invitado para verificar el colector.
+if ($PruebaObservador -and ($env:GITHUB_ACTIONS -ne 'true' -or $env:SECUREGATE_OBSERVADOR_QA -ne '1')) {
+    throw 'El modo de prueba del observador solo se permite en CI.'
+}
+$ErrorActionPreference = "Stop"
 $solicitud = Get-Content "C:\Entrada\solicitud.json" -Raw | ConvertFrom-Json
 $maxEventos = 2000
 
@@ -25,7 +30,9 @@ function Guardar-Informe([string]$Nombre) {
 }
 
 function Agregar-Evento([int]$Tipo, $ProcesoId, $PadreId,
-    [string]$Nombre, [string]$Recurso, [string]$Detalle) {
+    [string]$Nombre, [string]$Recurso, [string]$Detalle,
+    [string]$LineaComandos = "", [bool]$Atribuido = $false, [bool]$EsMuestra = $false,
+    [bool]$CambioRegistro = $false, [string]$DatosRegistro = "") {
     if ($informe.Eventos.Count -ge $maxEventos) {
         if (-not $informe.Limitaciones.Contains("Se alcanzó el límite de 2000 eventos.")) {
             $informe.Limitaciones.Add("Se alcanzó el límite de 2000 eventos.")
@@ -41,6 +48,11 @@ function Agregar-Evento([int]$Tipo, $ProcesoId, $PadreId,
         NombreProceso = $Nombre
         Recurso = $Recurso
         Detalle = $Detalle
+        LineaComandos = $LineaComandos.Substring(0, [Math]::Min(2048, $LineaComandos.Length))
+        AtribuidoAMuestra = $Atribuido
+        EsProcesoMuestra = $EsMuestra
+        CambioRegistroObservado = $CambioRegistro
+        DatosRegistro = $DatosRegistro.Substring(0, [Math]::Min(4096, $DatosRegistro.Length))
     })
 }
 
@@ -49,6 +61,22 @@ function Obtener-Procesos {
     foreach ($p in @(Get-CimInstance Win32_Process -ErrorAction Stop)) {
         $clave = "$($p.ProcessId)|$($p.CreationDate)"
         $mapa[$clave] = $p
+    }
+    return ,$mapa
+}
+
+# Comparación de dos claves concretas; no atribuye el autor de una escritura de registro.
+function Obtener-InicioAutomatico {
+    $mapa = @{}
+    foreach ($subclave in @("Run", "RunOnce")) {
+        $ruta = "Software\Microsoft\Windows\CurrentVersion\$subclave"
+        $clave = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($ruta)
+        if ($null -eq $clave) { continue }
+        try {
+            foreach ($nombre in @($clave.GetValueNames() | Select-Object -First 200)) {
+                $mapa["HKCU\$ruta\$nombre"] = [string]$clave.GetValue($nombre, "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+            }
+        } finally { $clave.Dispose() }
     }
     return ,$mapa
 }
@@ -69,7 +97,7 @@ try {
         throw "El SHA-256 de la copia dentro de Sandbox no coincide."
     }
 
-    # Observación limitada al perfil; no incluye registro ni todo el disco.
+    # Archivos del perfil y diferencias de Run/RunOnce; no incluye todo el registro ni todo el disco.
     $watcher = [System.IO.FileSystemWatcher]::new($env:USERPROFILE)
     $watcher.IncludeSubdirectories = $true
     $watcher.InternalBufferSize = 32768
@@ -79,6 +107,8 @@ try {
     Register-ObjectEvent $watcher Error -SourceIdentifier "SGError" | Out-Null
     $watcher.EnableRaisingEvents = $true
 
+    $inicioAnterior = Obtener-InicioAutomatico
+    $linaje = @{}
     $anteriores = Obtener-Procesos
     if ($solicitud.ModoDemostracion -eq $true) {
         # Acciones fijas de demostración, ejecutadas por la muestra cmd.exe.
@@ -90,7 +120,9 @@ try {
         $procesoMuestra = Start-Process -FilePath "C:\Prueba\muestra.exe" -WorkingDirectory "C:\Prueba" -PassThru -ErrorAction Stop
     }
     $informe.MuestraEjecutada = $true
-    Agregar-Evento 1 $procesoMuestra.Id $PID "muestra.exe" "C:\Prueba\muestra.exe" "Windows inició el proceso de la muestra."
+    $muestraCim = Get-CimInstance Win32_Process -Filter "ProcessId=$($procesoMuestra.Id)" -ErrorAction SilentlyContinue
+    if ($null -ne $muestraCim) { $linaje[[int]$procesoMuestra.Id] = $muestraCim.CreationDate }
+    Agregar-Evento 1 $procesoMuestra.Id $PID "muestra.exe" "C:\Prueba\muestra.exe" "Windows inició el proceso de la muestra." -EsMuestra $true -Atribuido $true
 
     $finObservacion = [DateTimeOffset]::UtcNow.AddSeconds([int]$solicitud.TiempoObservacionSegundos)
     $salidaRegistrada = $false
@@ -113,12 +145,29 @@ try {
         }
 
         $actuales = Obtener-Procesos
-        foreach ($clave in $actuales.Keys) {
+        $porPid = @{}
+        foreach ($p in $actuales.Values) { $porPid[[int]$p.ProcessId] = $p }
+        foreach ($p in @($actuales.Values | Sort-Object CreationDate)) {
+            $idProceso = [int]$p.ProcessId
+            $idPadre = [int]$p.ParentProcessId
+            if ($linaje.ContainsKey($idProceso) -and $linaje[$idProceso] -ne $p.CreationDate) { $linaje.Remove($idProceso) }
+            if ($linaje.ContainsKey($idPadre) -and $porPid.ContainsKey($idPadre) -and
+                $porPid[$idPadre].CreationDate -eq $linaje[$idPadre] -and $p.CreationDate -ge $linaje[$idPadre]) {
+                $linaje[$idProceso] = $p.CreationDate
+            }
+            $clave = "$($p.ProcessId)|$($p.CreationDate)"
             if (-not $anteriores.ContainsKey($clave)) {
-                $p = $actuales[$clave]
-                Agregar-Evento 1 ([int]$p.ProcessId) ([int]$p.ParentProcessId) $p.Name $p.ExecutablePath "Proceso nuevo observado; no necesariamente pertenece a la muestra."
+                $atribuido = $linaje.ContainsKey($idProceso) -and $linaje[$idProceso] -eq $p.CreationDate
+                Agregar-Evento 1 $idProceso $idPadre $p.Name $p.ExecutablePath "Proceso observado; relación de padres comprobada cuando AtribuidoAMuestra=true." -LineaComandos ([string]$p.CommandLine) -Atribuido $atribuido
             }
         }
+        $inicioActual = Obtener-InicioAutomatico
+        foreach ($rutaInicio in $inicioActual.Keys) {
+            if (-not $inicioAnterior.ContainsKey($rutaInicio) -or $inicioAnterior[$rutaInicio] -ne $inicioActual[$rutaInicio]) {
+                Agregar-Evento 6 $null $null "" $rutaInicio "Cambio observado en inicio automático HKCU; autor no identificado." -CambioRegistro $true -DatosRegistro ([string]$inicioActual[$rutaInicio])
+            }
+        }
+        $inicioAnterior = $inicioActual
         foreach ($clave in $anteriores.Keys) {
             if (-not $actuales.ContainsKey($clave)) {
                 $p = $anteriores[$clave]
@@ -167,5 +216,5 @@ finally {
     $informe.FinUtc = [DateTimeOffset]::UtcNow.ToString("o")
     Guardar-Informe "informe"
     # Apaga únicamente el invitado donde se está ejecutando este script.
-    & "$env:SystemRoot\System32\shutdown.exe" /s /t 0
+    if (-not $PruebaObservador) { & "$env:SystemRoot\System32\shutdown.exe" /s /t 0 }
 }

@@ -10,6 +10,7 @@ public static class PoliticaDecisionAnalisis
     public static TipoResultadoDecision Clasificar(ResultadoAnalisis r)
     {
         var local = r.AnalisisLocal;
+        if (AnalizadorComportamientoSandbox.Analizar(r).Count > 0) return TipoResultadoDecision.Riesgo;
         if (r.Evaluacion == EvaluacionRiesgo.AmenazaDetectada ||
             r.Evaluacion == EvaluacionRiesgo.Sospechoso ||
             local?.Antivirus.Deteccion == DeteccionAntivirus.AmenazaDetectada ||

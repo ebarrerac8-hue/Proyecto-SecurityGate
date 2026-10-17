@@ -6,7 +6,7 @@ namespace SecureGate.Servidor;
 
 public static class PoliticaReutilizacionSandbox
 {
-    public const string VersionActual = "securegate-sandbox-v1";
+    public const string VersionActual = "securegate-sandbox-v2-comportamiento";
 
     public static TrabajoAnalisis? Seleccionar(IEnumerable<TrabajoAnalisis> trabajos,
         TrabajoAnalisis actual, OpcionesServidor opciones, DateTimeOffset ahora)

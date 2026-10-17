@@ -18,7 +18,7 @@ public sealed class InformeIa
     public EstadoComprobacion Estado { get; set; } = EstadoComprobacion.NoRealizada;
     public string Proveedor { get; init; } = "Gemini";
     public string Modelo { get; init; } = string.Empty;
-    public string VersionInstrucciones { get; init; } = "securegate-ia-1";
+    public string VersionInstrucciones { get; init; } = "securegate-ia-2-comportamiento";
     public DateTimeOffset? FechaConsultaUtc { get; init; }
     public DateTimeOffset? FechaFinalizacionUtc { get; set; }
     public string Resumen { get; set; } = string.Empty;
@@ -26,6 +26,8 @@ public sealed class InformeIa
     public List<ObservacionIa> Observaciones { get; set; } = new();
     public List<EvidenciaIa> EvidenciasEnviadas { get; init; } = new();
     public List<string> Limitaciones { get; set; } = new();
+    public string EvaluacionComportamiento { get; set; } = "NoConcluyente";
+    public List<ObservacionIa> ObservacionesComportamiento { get; set; } = new();
     public string? CodigoError { get; set; }
 }
 

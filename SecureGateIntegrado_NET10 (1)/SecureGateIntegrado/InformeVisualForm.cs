@@ -210,6 +210,8 @@ internal sealed class InformeVisualForm : Form
             if (!string.IsNullOrWhiteSpace(ia.Resumen))
                 inner.Add(Quote(ia.Resumen, Azul, AzulClaro));
 
+            inner.Add(Row("Comportamiento IA", ia.EvaluacionComportamiento));
+            foreach (var observacion in ia.ObservacionesComportamiento) inner.Add(ObsItem(observacion));
             if (ia.Observaciones.Count > 0)
             {
                 inner.Add(SubLabel("Observaciones"));

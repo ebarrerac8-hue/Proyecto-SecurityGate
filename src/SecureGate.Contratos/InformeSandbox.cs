@@ -29,6 +29,11 @@ public sealed class EventoSandbox
     public string? Recurso { get; init; }
 
     public string Detalle { get; init; } = string.Empty;
+    public string? LineaComandos { get; init; }
+    public bool AtribuidoAMuestra { get; init; }
+    public bool EsProcesoMuestra { get; init; }
+    public bool CambioRegistroObservado { get; init; }
+    public string? DatosRegistro { get; init; }
 }
 
 public sealed class InformeSandbox

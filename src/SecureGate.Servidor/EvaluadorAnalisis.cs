@@ -60,6 +60,12 @@ public static class EvaluadorAnalisis
             }
         }
 
+        foreach (var hallazgo in AnalizadorComportamientoSandbox.Analizar(resultado))
+        {
+            sospechoso = true;
+            resultado.Motivos.Add($"Sandbox [{hallazgo.Codigo}]: {hallazgo.Descripcion} Eventos: {string.Join(", ", hallazgo.Eventos)}.");
+        }
+
         if (amenaza)
         {
             resultado.Evaluacion = EvaluacionRiesgo.AmenazaDetectada;

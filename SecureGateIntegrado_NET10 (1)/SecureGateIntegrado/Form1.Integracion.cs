@@ -715,6 +715,9 @@ public partial class Form1
         texto.AppendLine("Resultado visible: " + PresentacionAnalisis.Resultado(envio));
         texto.AppendLine("Alcance: " + PresentacionAnalisis.Alcance(envio));
         texto.AppendLine("Evaluación técnica original: " + resultado.Evaluacion);
+        foreach (var hallazgo in AnalizadorComportamientoSandbox.Analizar(resultado))
+            texto.AppendLine("COMPORTAMIENTO SANDBOX [" + hallazgo.Codigo + "]: " + hallazgo.Descripcion +
+                " Eventos: " + string.Join(", ", hallazgo.Eventos));
         texto.AppendLine("Estado técnico de evaluación: " + resultado.Evaluacion);
         texto.AppendLine("Resumen: " + resultado.Resumen);
         texto.AppendLine("Reputación: " + resultado.Reputacion?.Detalle);
@@ -730,6 +733,9 @@ public partial class Form1
             texto.AppendLine($"Consulta: {ia.FechaConsultaUtc:o}; finalización: {ia.FechaFinalizacionUtc:o}");
             texto.AppendLine("Código de error IA: " + ia.CodigoError);
             texto.AppendLine(ia.Resumen);
+            texto.AppendLine("Evaluación de comportamiento IA: " + ia.EvaluacionComportamiento);
+            foreach (var observacion in ia.ObservacionesComportamiento)
+                texto.AppendLine("- Comportamiento IA: " + observacion.Texto + " [" + string.Join(", ", observacion.Referencias) + "]");
             texto.AppendLine("Referencias del resumen: " + string.Join(", ", ia.ReferenciasResumen));
             foreach (var observacion in ia.Observaciones)
                 texto.AppendLine("- " + observacion.Texto + " [" +
