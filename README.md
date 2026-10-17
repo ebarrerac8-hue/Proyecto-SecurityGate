@@ -18,6 +18,12 @@ Para la demostración se inicia manualmente: **Servidor → Túnel público → 
 
 La entrega Windows x64 se genera con `dotnet publish -c Release -r win-x64 --self-contained true`. Cliente y Servidor tienen carpetas separadas; el servidor debe incluir `Assets/Guest/Observador.ps1`. No distribuir claves, certificados privados ni muestras con la entrega.
 
+## Señales de comportamiento de Sandbox
+
+El servidor evalúa señales de la observación: PowerShell con órdenes codificadas en descendientes atribuidos a la muestra, cambios de inicio automático HKCU Run/RunOnce que apuntan a ella y órdenes de borrado de registros o recuperación en descendientes atribuidos. Los hallazgos conservan los identificadores de eventos y pueden elevar la evaluación a `Sospechoso` sin detecciones de antivirus o reputación. No confirman por sí solos malware ni éxito de las órdenes observadas.
+
+Gemini evalúa la relevancia de esos indicios con referencias verificadas, conserva la evaluación de reglas y no autoriza ejecución o liberación. La observación sigue siendo parcial y los datos del invitado no son resistentes a manipulación. Véase la [guía de prueba benigna y alcance](herramientas/SecureGate.Comportamiento/README.md). La prueba de CI verifica el colector en Windows efímero; la comprobación dentro de Windows Sandbox debe realizarse en el equipo de entrega. Actualizar servidor y cliente juntos.
+
 ## Persistencia y recuperación
 
 Se utilizan archivos JSON y muestras en disco, no una base de datos SQL:

@@ -48,6 +48,10 @@ Exigir(AnalizadorComportamientoSandbox.Analizar(sinRaiz).Count == 0, "telemetria
 var fueraDeTiempo = Modelo(); var tardio = new EventoSandbox { FechaUtc=DateTimeOffset.UtcNow.AddHours(1), Tipo=TipoEventoSandbox.ProcesoIniciado, ProcesoId=200, ProcesoPadreId=100, AtribuidoAMuestra=true, NombreProceso="powershell.exe", LineaComandos="powershell.exe -enc ZQ==" };
 fueraDeTiempo.Sandbox!.Eventos.Add(tardio);
 Exigir(AnalizadorComportamientoSandbox.Analizar(fueraDeTiempo).Count == 0, "eventos fuera de la ventana no generan hallazgos.");
+var amenaza = JsonSerializer.Deserialize<ResultadoAnalisis>(JsonSerializer.Serialize(codificado))!;
+amenaza.Reputacion = new() { Sha256=amenaza.Archivo.Sha256, Estado=EstadoComprobacion.Completada, InformeEncontrado=true, MotoresMaliciosos=1 };
+EvaluadorAnalisis.Evaluar(amenaza);
+Exigir(amenaza.Evaluacion == EvaluacionRiesgo.AmenazaDetectada, "comportamiento no rebaja una amenaza reportada por otro motor.");
 var datos = PreparadorEvidenciasIa.Preparar(codificado);
 Exigir(datos.Any(e=>e.Tipo=="Comportamiento" && e.Descripcion.Contains("SG-B001")), "Gemini recibe regla y referencias de eventos reales.");
 var copia = JsonSerializer.Deserialize<ResultadoAnalisis>(JsonSerializer.Serialize(codificado))!;
