@@ -53,6 +53,8 @@ public sealed class InformeSandbox
     public string? NombreArchivoOrigen { get; set; }
     public DateTimeOffset? FechaReutilizacionUtc { get; set; }
 
+    public bool DemostracionComportamiento { get; set; }
+
     public bool MuestraEjecutada { get; set; }
 
     public bool ObservadorIniciado { get; set; }

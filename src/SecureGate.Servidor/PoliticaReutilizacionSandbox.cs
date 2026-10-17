@@ -11,7 +11,7 @@ public static class PoliticaReutilizacionSandbox
     public static TrabajoAnalisis? Seleccionar(IEnumerable<TrabajoAnalisis> trabajos,
         TrabajoAnalisis actual, OpcionesServidor opciones, DateTimeOffset ahora)
     {
-        if (!opciones.ReutilizacionSandboxHabilitada ||
+        if (opciones.DemostracionComportamiento || !opciones.ReutilizacionSandboxHabilitada ||
             opciones.VigenciaSandboxDias is < 1 or > 90 ||
             opciones.InformeRecienteHoras is < 1 or > 168 ||
             actual.Resultado.Reputacion is not { Estado: EstadoComprobacion.Completada } rep ||
@@ -52,7 +52,7 @@ public static class PoliticaReutilizacionSandbox
                 r.AnalisisLocal.Antivirus.Amenazas.Count != 0 ||
                 s is not { Estado: EstadoComprobacion.Completada, MuestraEjecutada: true,
                     ObservadorIniciado: true, RedHabilitada: false } ||
-                s.CodigoError is not null ||
+                s.DemostracionComportamiento || s.CodigoError is not null ||
                 s.AnalisisId != r.AnalisisId || s.ArchivoId != r.Archivo.ArchivoId ||
                 !Igual(s.Sha256, r.Archivo.Sha256) ||
                 s.InicioUtc is not { } inicio || s.FinUtc is not { } fin ||

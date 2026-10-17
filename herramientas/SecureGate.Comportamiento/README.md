@@ -12,6 +12,24 @@ Las reglas verifican identidad, hash, ventana temporal y raíz de la muestra. Lo
 
 Gemini recibe los hallazgos y sus identificadores de eventos, evalúa su relevancia y devuelve observaciones estructuradas con referencias. El servidor valida que las referencias de comportamiento correspondan a hallazgos reales. La IA no elimina señales de reglas ni concede permisos de ejecución. Sus interpretaciones pueden ser incorrectas.
 
+## Equipos que bloquean la muestra sin firma
+
+Control de aplicaciones puede impedir ejecutar el EXE propio, incluso dentro del invitado. En ese caso no hay observación ni detección de comportamiento: el informe registra `SANDBOX_EJECUCION_BLOQUEADA`. No modificar Defender, Control de aplicaciones, certificados ni exclusiones para esta demostración.
+
+La alternativa es un laboratorio explícito con una copia de **cmd.exe del servidor**, validada por SHA-256 antes de elegir las acciones de laboratorio. Nunca se sustituye automáticamente una muestra bloqueada. Los archivos normales conservan su ejecución normal. El modo está desactivado por defecto y la sesión se inicia con:
+
+```powershell
+.\herramientas\SecureGate.Comportamiento\IniciarLaboratorio.ps1 -Entrega "RUTA_DE_ENTREGA"
+```
+
+Con el servidor anterior cerrado, este comando inicia el servidor publicado con la opción de laboratorio únicamente en ese proceso. Ngrok y el cliente se usan normalmente. Detener el laboratorio y volver al lanzador habitual elimina el modo. Generar fuera de Descargas, **en el equipo del servidor**, la copia que se compartirá:
+
+```powershell
+.\herramientas\SecureGate.Comportamiento\PrepararDemoFirmada.ps1 -Destino "$env:TEMP\SecureGate_Laboratorio\DemoFirmada.exe"
+```
+
+Copiar después ese archivo a la carpeta monitoreada, sin abrirlo manualmente. Dentro del invitado cmd inicia PowerShell con una orden codificada benigna que crea un marcador y una entrada temporal de inicio automático apuntando a la muestra. Retira solo sus propios elementos. Se esperan SG-B001 y SG-B002. El informe y la IA identifican expresamente las acciones predeterminadas: **demuestra observación y evaluación de señales conocidas, no detección de un virus real**. La reutilización está desactivada durante el laboratorio y sus observaciones no se reutilizan en análisis normales. No se garantiza que todas las políticas permitan cmd o PowerShell; cualquier bloqueo se conserva en el informe.
+
 ## Preparación en Windows
 
 Actualizar **servidor y cliente**, con ambos cerrados antes de publicar. El servidor debe recibir el nuevo Observador.ps1. Generar después el paquete privado del cliente con la conexión configurada.

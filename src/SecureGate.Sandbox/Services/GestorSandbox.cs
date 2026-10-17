@@ -136,7 +136,8 @@ public sealed class GestorSandbox : IAnalizadorSandbox
                 solicitud.ArchivoId,
                 solicitud.Sha256,
                 solicitud.TiempoObservacionSegundos,
-                ModoDemostracion = demostracion
+                ModoDemostracion = demostracion,
+                DemostracionComportamiento = demostracion && solicitud.DemostracionComportamiento
             };
             await File.WriteAllTextAsync(Path.Combine(entrada, "solicitud.json"),
                 JsonSerializer.Serialize(datosInvitado), cancellationToken);

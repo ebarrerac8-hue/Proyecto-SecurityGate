@@ -58,7 +58,9 @@ internal static class PresentacionAnalisis
     };
 
     internal static string Informe(EnvioCliente envio) =>
-        envio.Resultado?.Estado != EstadoAnalisis.Completado ? "Informe final aún no disponible"
+        envio.Resultado?.Estado == EstadoAnalisis.Fallido ? "Informe disponible con errores de análisis"
+        : envio.Resultado?.Estado == EstadoAnalisis.Cancelado ? "Informe disponible de análisis cancelado"
+        : envio.Resultado?.Estado != EstadoAnalisis.Completado ? "Informe final aún no disponible"
         : Faltantes(envio).Count == 0 ? "Informe completo disponible"
         : "Informe generado con comprobaciones pendientes";
 

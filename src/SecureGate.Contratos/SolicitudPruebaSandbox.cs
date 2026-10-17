@@ -7,6 +7,7 @@ public sealed class SolicitudPruebaSandbox
     public required string Sha256 { get; init; }
     public required string RutaMuestraServidor { get; init; }
     public string ExtensionMuestra { get; init; } = string.Empty;
+    public bool DemostracionComportamiento { get; init; }
     public int TiempoObservacionSegundos { get; init; } = 120;
 }
 

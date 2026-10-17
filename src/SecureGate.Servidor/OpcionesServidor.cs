@@ -2,6 +2,9 @@ namespace SecureGate.Servidor;
 
 public sealed class OpcionesServidor
 {
+    // Laboratorio explícito, solo para el SHA-256 de cmd.exe del servidor.
+    public bool DemostracionComportamiento { get; set; } = false;
+
     // La observación original puede reutilizarse hasta 30 días; nunca renueva su fecha.
     public bool ReutilizacionSandboxHabilitada { get; set; } = true;
     public int InformeRecienteHoras { get; set; } = 24;

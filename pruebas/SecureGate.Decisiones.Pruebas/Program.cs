@@ -19,6 +19,7 @@ internal static class Program
         ProbarPaquete();
         ProbarProgreso();
         ProbarDialogos();
+        ProbarInformeVisual();
         ProbarClienteOculto();
         ProbarClienteProgreso();
         Console.WriteLine("Pruebas de decisión y diálogos aprobadas; sin claves, malware ni apertura real de ejecutables.");
@@ -258,6 +259,27 @@ internal static class Program
             Capturar(textoGrande, "TextoGrande"); temporizador.Start();
         };
         textoGrande.ShowDialog();
+    }
+
+    private static void ProbarInformeVisual()
+    {
+        var archivo = new InformacionArchivo { ArchivoId=Guid.NewGuid(), NombreOriginal="PruebaDeInforme.exe",
+            Extension=".exe", TamanoBytes=6144, Sha256=new string('b',64) };
+        var r = Informe(archivo, Guid.NewGuid());
+        r.Estado=EstadoAnalisis.Fallido; r.CodigoError="SANDBOX_EJECUCION_BLOQUEADA";
+        r.Sandbox!.Estado=EstadoComprobacion.Fallida; r.Sandbox.MuestraEjecutada=false;
+        r.Resumen="Windows bloqueó la ejecución; no se pudo observar el comportamiento.";
+        var envio = new EnvioCliente { Solicitud=new() { SolicitudId=Guid.NewGuid(), AnalisisLocal=r.AnalisisLocal! },
+            Resultado=r, RutaArchivo="prueba.bytes", Servidor="https://pruebas.invalid/" };
+        foreach (int ancho in new[] {680,840})
+        {
+            using var ventana = new InformeVisualForm(envio);
+            ventana.Show(); ventana.Width=ancho; Application.DoEvents();
+            var botones = Controles(ventana).OfType<Button>().Where(b=>b.Name is "CerrarInforme" or "ExportarInforme").ToArray();
+            Exigir(botones.Length==2 && botones.All(b=>b.Parent!.ClientRectangle.Contains(b.Bounds)) &&
+                !botones[0].Bounds.IntersectsWith(botones[1].Bounds), "informe conserva botones completos sin solapamiento a " + ancho);
+            Capturar(ventana,"InformeBloqueado_"+ancho); ventana.Close();
+        }
     }
 
     private static void Capturar(Form ventana, string nombre)

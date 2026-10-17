@@ -12,6 +12,7 @@ $informe = [ordered]@{
     ArchivoId = $solicitud.ArchivoId
     Sha256 = $solicitud.Sha256
     Estado = 2
+    DemostracionComportamiento = ($solicitud.ModoDemostracion -eq $true -and $solicitud.DemostracionComportamiento -eq $true)
     MuestraEjecutada = $false
     ObservadorIniciado = $true
     RedHabilitada = $false
@@ -114,6 +115,30 @@ try {
         # Acciones fijas de demostración, ejecutadas por la muestra cmd.exe.
         $acciones = '/d /c echo Creado dentro de Sandbox > "%USERPROFILE%\Desktop\SecureGate_Prueba.txt" & ping -n 4 127.0.0.1 > nul & echo Modificado dentro de Sandbox >> "%USERPROFILE%\Desktop\SecureGate_Prueba.txt" & ping -n 4 127.0.0.1 > nul & del "%USERPROFILE%\Desktop\SecureGate_Prueba.txt" & ping -n 4 127.0.0.1 > nul'
         $informe.Limitaciones.Add("Demostración con cmd.exe de Windows y acciones predeterminadas; no es el análisis de un instalador.")
+        if ($informe.DemostracionComportamiento) {
+            # El servidor exige coincidencia de hash con su cmd.exe. Nunca sustituye una muestra bloqueada.
+            $idPrueba = ([Guid]$solicitud.AnalisisId).ToString('N')
+            $guion = @'
+Start-Sleep -Seconds 2
+$ruta = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+$nombre = 'SecureGate_Demo_IDPRUEBA'
+$marcador = "$env:USERPROFILE\Desktop\SecureGate_Demo_IDPRUEBA.txt"
+if ((Get-ItemProperty -LiteralPath $ruta -Name $nombre -ErrorAction SilentlyContinue) -or (Test-Path -LiteralPath $marcador)) { exit 12 }
+try {
+    New-Item -Path $ruta -Force | Out-Null
+    New-ItemProperty -LiteralPath $ruta -Name $nombre -Value '"C:\Prueba\muestra.exe" --demostracion' -PropertyType String -ErrorAction Stop | Out-Null
+    Set-Content -LiteralPath $marcador -Value 'DEMOSTRACION BENIGNA SECUREGATE'
+    Start-Sleep -Seconds 12
+} finally {
+    Remove-ItemProperty -LiteralPath $ruta -Name $nombre -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $marcador -ErrorAction SilentlyContinue
+}
+'@
+            $guion = $guion.Replace('IDPRUEBA', $idPrueba)
+            $codificada = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($guion))
+            $acciones = '/d /c powershell.exe -NoLogo -NoProfile -EncodedCommand ' + $codificada
+            $informe.Limitaciones.Add("LABORATORIO DE COMPORTAMIENTO: cmd.exe firmado con acciones benignas predeterminadas. No es malware ni el análisis de un instalador.")
+        }
         $procesoMuestra = Start-Process -FilePath "C:\Prueba\muestra.exe" -ArgumentList $acciones -WorkingDirectory "C:\Prueba" -PassThru -ErrorAction Stop
     }
     else {
@@ -193,9 +218,14 @@ catch {
     if (-not $informe.CodigoError) {
         $informe.CodigoError = "SANDBOX_OBSERVADOR_ERROR"
         $causa = $_.Exception
+        # PowerShell puede envolver Win32Exception en ErrorRecord o RuntimeException.
+        if ($_.ToString() -match '(?i)Application Control policy|directiva de Control de aplicaciones') {
+            $informe.CodigoError = "SANDBOX_EJECUCION_BLOQUEADA"
+        }
         while ($null -ne $causa) {
-            if ($causa -is [System.ComponentModel.Win32Exception] -and
-                $causa.NativeErrorCode -in @(4551, 1260)) {
+            if (($causa -is [System.ComponentModel.Win32Exception] -and
+                $causa.NativeErrorCode -in @(4551, 1260)) -or
+                (($causa.HResult -band 65535) -in @(4551, 1260))) {
                 $informe.CodigoError = "SANDBOX_EJECUCION_BLOQUEADA"
                 break
             }
@@ -203,6 +233,9 @@ catch {
         }
     }
     $informe.Limitaciones.Add($_.Exception.Message)
+    if ($informe.CodigoError -eq "SANDBOX_EJECUCION_BLOQUEADA") {
+        $informe.Limitaciones.Add("Windows bloqueó la ejecución dentro del invitado; no se observó el comportamiento. No equivale a una detección de malware. No se modificaron las protecciones del equipo.")
+    }
 }
 finally {
     if ($null -ne $watcher) {

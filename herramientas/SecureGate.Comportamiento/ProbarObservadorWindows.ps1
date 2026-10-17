@@ -1,3 +1,4 @@
+param([switch]$DemoFirmada)
 # Prueba exclusiva de CI sobre un equipo efimero. No inicia Windows Sandbox.
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Esta prueba solo se ejecuta en CI efimero.' }
@@ -11,11 +12,15 @@ try {
     foreach ($ruta in $rutas) { New-Item -ItemType Directory -Path $ruta | Out-Null }
     New-Item -ItemType Directory -Path $escritorio -Force | Out-Null
     $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-    & $csc /nologo /target:winexe /define:SECUREGATE_QA '/out:C:\Entrada\muestra.exe' (Join-Path $PSScriptRoot 'MuestraControlada.cs')
-    if ($LASTEXITCODE -ne 0) { throw 'Fallo la compilacion del fixture de CI.' }
+    if ($DemoFirmada) {
+        Copy-Item -LiteralPath "$env:WINDIR\System32\cmd.exe" -Destination 'C:\Entrada\muestra.exe'
+    } else {
+        & $csc /nologo /target:winexe /define:SECUREGATE_QA '/out:C:\Entrada\muestra.exe' (Join-Path $PSScriptRoot 'MuestraControlada.cs')
+        if ($LASTEXITCODE -ne 0) { throw 'Fallo la compilacion del fixture de CI.' }
+    }
     $hash = (Get-FileHash -LiteralPath 'C:\Entrada\muestra.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
     @{AnalisisId=[Guid]::NewGuid().ToString(); ArchivoId=[Guid]::NewGuid().ToString(); Sha256=$hash;
-        TiempoObservacionSegundos=20; ModoDemostracion=$false} | ConvertTo-Json |
+        TiempoObservacionSegundos=20; ModoDemostracion=[bool]$DemoFirmada; DemostracionComportamiento=[bool]$DemoFirmada} | ConvertTo-Json |
         Set-Content -LiteralPath 'C:\Entrada\solicitud.json' -Encoding UTF8
     $env:SECUREGATE_OBSERVADOR_QA = '1'
     $observador = Join-Path $PSScriptRoot '..\..\src\SecureGate.Sandbox\Assets\Guest\Observador.ps1'
@@ -26,7 +31,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'El observador no produjo las señales esperadas.' }
     if ($env:SECUREGATE_DECISION_QA_DIR) {
         New-Item -ItemType Directory -Path $env:SECUREGATE_DECISION_QA_DIR -Force | Out-Null
-        Copy-Item -LiteralPath 'C:\Salida\informe.json' -Destination (Join-Path $env:SECUREGATE_DECISION_QA_DIR 'observador-comportamiento-ci.json')
+        Copy-Item -LiteralPath 'C:\Salida\informe.json' -Destination (Join-Path $env:SECUREGATE_DECISION_QA_DIR ('observador-comportamiento-ci' + $(if ($DemoFirmada) { '-firmado' } else { '' }) + '.json'))
     }
 } finally {
     $env:SECUREGATE_OBSERVADOR_QA = $antes
@@ -34,7 +39,7 @@ try {
     # El fixture crea solo entradas con este prefijo y un GUID; se retiran si se interrumpio.
     $clave = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run', $true)
     if ($clave) { try { foreach ($nombre in $clave.GetValueNames()) {
-        if ($nombre -match '^SecureGate_PruebaControlada_[a-f0-9]{32}$') { $clave.DeleteValue($nombre, $false) }
+        if ($nombre -match '^SecureGate_(PruebaControlada|Demo)_[a-f0-9]{32}$') { $clave.DeleteValue($nombre, $false) }
     } } finally { $clave.Dispose() } }
     if (Test-Path -LiteralPath $marcador) { Remove-Item -LiteralPath $marcador -Force }
 }

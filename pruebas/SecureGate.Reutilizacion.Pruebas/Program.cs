@@ -84,6 +84,12 @@ encadenado.Resultado = new ResultadoAnalisis { AnalisisId = copia.AnalisisId, Ar
 var segunda = PoliticaReutilizacionSandbox.Copiar(encadenado, Trabajo(), ahora);
 Ver(segunda.AnalisisOrigenId == origen.Resultado.AnalisisId && segunda.FinUtc == copia.FinUtc,
     "cadena de reutilizaciones mantiene primer origen y vigencia");
+origen.Resultado.Sandbox!.DemostracionComportamiento=true;
+Ver(!Reusa(origen, actual), "demostracion controlada no se reutiliza como observacion normal");
+origen.Resultado.Sandbox.DemostracionComportamiento=false;
+opciones.DemostracionComportamiento=true;
+Ver(!Reusa(origen, actual), "laboratorio exige observacion nueva");
+opciones.DemostracionComportamiento=false;
 string carpeta = Path.Combine(Path.GetTempPath(), "SecureGate_Reutilizacion_" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(carpeta);
 try

@@ -93,30 +93,30 @@ internal sealed class InformeVisualForm : Form
         Controls.Add(header);
 
         // ── Footer ──────────────────────────────────────
-        var footer = new Panel
+        var footer = new FlowLayoutPanel
         {
-            Dock      = DockStyle.Bottom,
-            Height    = 52,
-            BackColor = Blanco
+            Dock = DockStyle.Bottom, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.RightToLeft, WrapContents = false,
+            Padding = new Padding(12, 8, 12, 8), BackColor = Blanco
         };
         footer.Paint += (_, e) =>
-            e.Graphics.DrawLine(new Pen(GrisBorde, 1), 0, 0, footer.Width, 0);
-
-        var btnExp = MakeBtn("📥  Exportar", Azul, Blanco);
+        {
+            using var pen = new Pen(GrisBorde, 1);
+            e.Graphics.DrawLine(pen, 0, 0, footer.ClientSize.Width, 0);
+        };
+        var btnExp = MakeBtn("Exportar", Azul, Blanco);
+        btnExp.Name = "ExportarInforme";
         btnExp.Click += (_, _) => ExportarTxt();
         var btnClose = MakeBtn("Cerrar", GrisBorde, GrisOscuro);
+        btnClose.Name = "CerrarInforme";
         btnClose.Click += (_, _) => Close();
-
-        footer.Controls.Add(btnClose);
-        footer.Controls.Add(btnExp);
-        footer.Resize += (_, _) =>
+        foreach (var boton in new[] { btnClose, btnExp })
         {
-            btnClose.Location = new Point(footer.Width - 120, 8);
-            btnExp.Location   = new Point(footer.Width - 290, 8);
-        };
-        // Posición inicial
-        btnClose.Location = new Point(700, 8);
-        btnExp.Location   = new Point(530, 8);
+            boton.AutoSize = true;
+            boton.MinimumSize = new Size(110, 36);
+            boton.Margin = new Padding(4, 0, 4, 0);
+            footer.Controls.Add(boton);
+        }
         Controls.Add(footer);
 
         // ── Área de scroll ──────────────────────────────
@@ -155,6 +155,10 @@ internal sealed class InformeVisualForm : Form
         var estTexto = res is null ? "⏳  Esperando resultado del servidor"
             : LabelEstado(res.Estado);
         items.Add(StatusBadge(estTexto, estColor));
+        if (res?.Sandbox?.DemostracionComportamiento == true)
+            items.Add(Quote("Demostración controlada con cmd.exe de Windows y acciones benignas predeterminadas. No es una muestra de malware ni el análisis de un instalador.", Azul, AzulClaro));
+        if (res?.CodigoError == "SANDBOX_EJECUCION_BLOQUEADA")
+            items.Add(Quote("Windows bloqueó la ejecución dentro de Sandbox. No se pudo observar el comportamiento; este bloqueo no demuestra malware.", Rojo, RojoFondo));
 
         // 3. Evaluación
         if (res is not null)
