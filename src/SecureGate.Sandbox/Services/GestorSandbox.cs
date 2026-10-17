@@ -181,7 +181,7 @@ public sealed class GestorSandbox : IAnalizadorSandbox
 
             informe.Limitaciones.Add(
                 "Observación parcial de procesos y archivos del perfil del usuario. " +
-                "No se observaron registro ni conexiones de red; pueden perderse procesos breves.");
+                "Se compararon únicamente Run/RunOnce del usuario; no se observaron conexiones de red y pueden perderse procesos breves.");
             informe.Limitaciones.Add(
                 "Las evidencias provienen del entorno que ejecuta la muestra y no son " +
                 "una prueba resistente a manipulación por software hostil.");

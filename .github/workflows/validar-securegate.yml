@@ -58,6 +58,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $pruebas = @(
+            @{ Nombre="SecureGate.Comportamiento.Pruebas"; Args=@() },
             @{ Nombre="SecureGate.Decisiones.Pruebas"; Args=@() },
             @{ Nombre="SecureGate.Alcance.Pruebas"; Args=@() },
             @{ Nombre="SecureGate.Ia.Pruebas"; Args=@() },
@@ -79,13 +80,20 @@ jobs:
             & dotnet @argumentos
             if ($LASTEXITCODE -ne 0) { throw "Fallo la prueba $($prueba.Nombre)." }
           }
-          "Compilacion y 12 ejecuciones de pruebas aisladas aprobadas en Windows." |
+          "Compilacion y 13 ejecuciones de pruebas aisladas aprobadas en Windows." |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+      - name: Probar observador real con muestra benigna en Windows
+        env:
+          SECUREGATE_DECISION_QA_DIR: '${{ runner.temp }}/securegate-decision-qa'
+        shell: pwsh
+        run: |
+          & ./herramientas/SecureGate.Comportamiento/ProbarObservadorWindows.ps1
 
       - name: Guardar capturas de los cuadros de decision
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: cuadros-decision-windows
-          path: '${{ runner.temp }}/securegate-decision-qa/*.png'
+          path: '${{ runner.temp }}/securegate-decision-qa/*'
           if-no-files-found: ignore

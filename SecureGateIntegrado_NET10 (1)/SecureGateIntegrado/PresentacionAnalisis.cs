@@ -38,6 +38,7 @@ internal static class PresentacionAnalisis
             local.Antivirus.Deteccion == DeteccionAntivirus.AmenazaDetectada ||
             local.Antivirus.Amenazas.Count > 0 || informe?.Reputacion?.MotoresMaliciosos > 0)
             return Amenaza;
+        if (informe is not null && AnalizadorComportamientoSandbox.Analizar(informe).Count > 0) return Precaucion;
         if (informe?.Evaluacion == EvaluacionRiesgo.Sospechoso ||
             informe?.Reputacion?.MotoresSospechosos > 0 ||
             local.FirmaDigital.Firma == EstadoFirmaDigital.Invalida) return Precaucion;

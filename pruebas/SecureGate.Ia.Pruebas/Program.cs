@@ -146,7 +146,37 @@ using (var http = new HttpClient(handler))
     Console.WriteLine("CORRECTO 8: omite rutas completas, hash, nombre original y detalle libre.");
 }
 
-Console.WriteLine("LAS OCHO PRUEBAS DE IA TERMINARON CORRECTAMENTE (SIN CONSULTAS REALES).");
+// Evaluación estructurada: una alerta de IA necesita una señal concreta del colector.
+foreach (bool referenciasValidas in new[] { true, false })
+{
+    var original = Resultado();
+    original.Evaluacion = EvaluacionRiesgo.Sospechoso;
+    var ahora = DateTimeOffset.UtcNow;
+    original.Sandbox = new() { AnalisisId=original.AnalisisId, ArchivoId=original.Archivo.ArchivoId,
+        Sha256=original.Archivo.Sha256, ObservadorIniciado=true, MuestraEjecutada=true,
+        InicioUtc=ahora.AddSeconds(-2), FinUtc=ahora.AddSeconds(2) };
+    original.Sandbox.Eventos.Add(new() { FechaUtc=ahora.AddSeconds(-1), Tipo=TipoEventoSandbox.ProcesoIniciado,
+        ProcesoId=100, EsProcesoMuestra=true, Recurso=@"C:\Prueba\muestra.exe" });
+    original.Sandbox.Eventos.Add(new() { FechaUtc=ahora, Tipo=TipoEventoSandbox.ProcesoIniciado,
+        ProcesoId=200, ProcesoPadreId=100, AtribuidoAMuestra=true, NombreProceso="powershell.exe",
+        LineaComandos="powershell.exe -enc ZQ==" });
+    string referencia = referenciasValidas
+        ? PreparadorEvidenciasIa.Preparar(original).First(e=>e.Tipo=="Comportamiento").Id : "E0003";
+    using var handler = new Simulador((_, _) => Task.FromResult(Respuesta(new {
+        evaluacionRecibida="Sospechoso", resumen="Hay indicios que requieren revisión.", referenciasResumen=new[]{"E0001"},
+        observaciones=Array.Empty<object>(), limitaciones=new[]{"La observación es limitada."},
+        comportamiento=new { evaluacion="SenalesSospechosas", observaciones=new[] {
+            new { texto="La muestra inició un descendiente con una instrucción codificada.", referencias=new[]{referencia} } } }
+    })));
+    using var http = new HttpClient(handler);
+    var informe = await Cliente(http).ExplicarAsync(original);
+    Comprobar(referenciasValidas
+        ? informe.Estado==EstadoComprobacion.Completada && informe.EvaluacionComportamiento=="SenalesSospechosas"
+        : informe.CodigoError=="IA_RESPUESTA_INVALIDA", "La IA aceptó señales sin evidencias de comportamiento o perdió una válida.");
+    Console.WriteLine("CORRECTO: evaluación de IA " + (referenciasValidas ? "vinculada a comportamiento observado." : "rechaza referencias ajenas al comportamiento."));
+}
+
+Console.WriteLine("LAS PRUEBAS DE IA TERMINARON CORRECTAMENTE (SIN CONSULTAS REALES).");
 
 internal sealed class Simulador(
     Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responder) : HttpMessageHandler

@@ -36,12 +36,17 @@ public static class PreparadorEvidenciasIa
             $"Estado: {sandbox.Estado}; muestra ejecutada: {sandbox.MuestraEjecutada}; " +
             $"observador iniciado: {sandbox.ObservadorIniciado}; red: {sandbox.RedHabilitada}; " +
             $"inicio: {sandbox.InicioUtc:o}; fin: {sandbox.FinUtc:o}; eventos: {sandbox.Eventos.Count}.");
+        Agregar("Cobertura", "Comprobaciones locales y reputación: " +
+            $"firma={local?.FirmaDigital.Estado}; antivirus={local?.Antivirus.Estado}; reputación={rep?.Estado}. " +
+            "Incompleto no implica que falten comprobaciones: puede expresar límites de la observación. No inventar capas faltantes.");
+        foreach (var h in AnalizadorComportamientoSandbox.Analizar(resultado).Take(12))
+            Agregar("Comportamiento", $"Regla {h.Codigo}: {h.Descripcion} Eventos observados: {string.Join(", ", h.Eventos)}.");
         if (sandbox?.AnalisisOrigenId is { } origen)
             Agregar("ReutilizacionSandbox", $"Observación histórica reutilizada; análisis de origen: {origen}; " +
                 $"archivo de origen: {NombreMinimo(sandbox.NombreArchivoOrigen)}; reutilización: {sandbox.FechaReutilizacionUtc:o}. " +
                 "No se ejecutó de nuevo el archivo para esta solicitud. Sus fechas y eventos corresponden a la observación original.");
         Agregar("Limitacion",
-            "La observación es parcial. No comprueba todo el registro, toda la red ni todos los procesos breves. " +
+            "La observación es parcial. Compara únicamente Run/RunOnce del usuario, no todo el registro ni toda la red; puede perder procesos breves. " +
             "Los eventos de archivo no identifican su autor. Las evidencias del invitado no son resistentes a manipulación.");
         Agregar("Limitacion",
             "Ausencia de detecciones no demuestra seguridad. Una demostración de acciones predeterminadas no es un análisis de un instalador.");
