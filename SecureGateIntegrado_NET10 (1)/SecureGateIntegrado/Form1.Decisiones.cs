@@ -158,7 +158,8 @@ public partial class Form1
         envio.DecisionUsuarioPendiente = false;
         envio.DecisionUsuario = decision;
         envio.FechaDecisionUsuarioUtc = DateTimeOffset.UtcNow;
-        envio.UltimoError = null;
+        // Elegir mantener o cerrar no resuelve el fallo del análisis.
+        // El reintento completado limpia su diagnóstico en AtenderEnvioAsync.
         await _envios.GuardarAsync(envio, _salida.Token);
         await _historialPersistencia.ActualizarRegistroAsync(envio);
     }

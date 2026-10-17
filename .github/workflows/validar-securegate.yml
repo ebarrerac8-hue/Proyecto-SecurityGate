@@ -51,6 +51,11 @@ jobs:
             if ($errores.Count -gt 0) { throw ($errores.Message -join "`n") }
           }
 
+      - name: Verificar preparacion automatica del lanzador
+        shell: pwsh
+        run: |
+          & ./herramientas/SecureGate.Comportamiento/ProbarLanzador.ps1
+
       - name: Ejecutar pruebas aisladas sin claves ni muestras reales
         env:
           SECUREGATE_DECISION_QA_DIR: '${{ runner.temp }}/securegate-decision-qa'
